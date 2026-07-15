@@ -12,7 +12,7 @@ jobs:
   ci:
     uses: keboola/component-ci/.github/workflows/component-pipeline.yml@master
     with:
-      app_id: keboola.ex-ukg-wfm
+      app_id: keboola.ukg-wfm
       vendor: keboola
       test_build_target: test
       docker_build_target: production

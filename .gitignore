@@ -15,5 +15,10 @@ venv
 
 # vcr datadirtesting
 secrets.json
-tests/functional/*/source/data/out/
-tests/functional/*/source/data/in/
+tests/mock/*/source/data/out/
+tests/mock/*/source/data/in/*
+!tests/mock/*/source/data/in/state.json
+
+# build lifecycle tracker (local only, never commit)
+docs/superpowers/*-lifecycle.md
+.claude/loop.md
