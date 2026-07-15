@@ -81,8 +81,18 @@ Transactional families (all **In-scope**):
   **split into ≤365-day sub-windows** to respect service limits. Net-change resources use their delta
   token. Advance watermark even on empty result (HR pattern).
 - **Output:** one table per resource, `<resource>.csv`, sorted deterministic columns, native-type
-  manifest (timestamps typed, rest string), incremental load with PK where the resource has a stable
-  key. Reuse HR's disk-backed streaming writer verbatim.
+  manifest (timestamps typed, rest string). Reuse HR's disk-backed streaming writer verbatim.
+  - **Native types require `dataTypeSupport=authoritative`** on the Dev Portal app (new components
+    default to `none`, which silently downgrades the `schema` manifest to legacy `column_metadata`
+    hints). Set it in Phase 6 (see §7); emit the `schema` / `data_type.base.type` format; keep
+    `has_header` aligned with whether the CSV is written with a header row.
+  - **Incremental only with a stable PK.** A resource lacking a stable primary key must run
+    **full-load**, not `incremental=true` (incremental-without-PK appends unboundedly). Give such a
+    resource a synthetic PK only if one is genuinely stable across runs.
+- **Scratch / staging → `/tmp`, never `data/out/tables/`.** Everything under `data/out/tables/` is
+  uploaded as a table regardless of output mapping. The Payroll async-export download and any
+  disk-backed intermediate (the streaming writer's temp file) stage in `/tmp`; only the final
+  per-resource CSV lands in `data/out/tables/`.
 - **Sync action:** `testConnection` mints a token.
 - **Exit codes:** `UserException` → 1; unexpected → 2 (HR `__main__` pattern).
 
@@ -103,7 +113,8 @@ New / rewritten:
   yield rows. Adaptive chunk shrink on 413.
 - **async bulk engine (Payroll)** — submit export → poll job status on an interval (bounded by a
   max-wait ceiling; surface a `UserException` if the ceiling is hit rather than hanging) → download
-  and stream the result. Polled in-component, consistent with our other async-export components.
+  to `/tmp` and stream the result into the output CSV. Polled in-component, consistent with our other
+  async-export components.
 - **`configuration.py`** — WFM fields (host, 4 secrets, resource, window, symbolic period, hyperfind,
   select, load type).
 
@@ -121,6 +132,9 @@ New / rewritten:
 
 - Scaffold via `component-get-started`; register in Dev Portal under **`keboola`** vendor; bootstrap
   `0.0.1` release; CI property-sync from `component_config/`.
+- **Phase 6 Dev Portal setup must set `dataTypeSupport=authoritative`** (`kbagent dev-portal patch`),
+  after the bootstrap release so CI-sync doesn't overwrite it — otherwise the native-type manifest is
+  downgraded to legacy hints.
 - Build `initial-implementation` branch image; **cf-dev smoke test deferred** until customer creds.
 
 ## 8. Risks / open items
