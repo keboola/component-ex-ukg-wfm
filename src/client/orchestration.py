@@ -113,6 +113,9 @@ def _extract_records(result: Any) -> list[dict]:
     return []
 
 
+_WINDOWED_STYLES = (IncrementalStyle.DATE_WINDOW, IncrementalStyle.NET_CHANGE)
+
+
 def iter_records(
     client: WfmClient,
     resource: ResourceDef,
@@ -121,24 +124,22 @@ def iter_records(
     since_iso: str | None,
     until_iso: str | None,
     select: list[str],
-    net_change_token: str | None = None,
 ) -> Iterator[dict]:
     emp_ids: list[int] = []
     if resource.employee_scope == EmployeeScope.HYPERFIND:
         emp_ids = resolve_employee_ids(client, hyperfind_ref)
 
-    if resource.incremental_style == IncrementalStyle.DATE_WINDOW and since_iso and until_iso:
+    # NET_CHANGE resources are treated as a plain date window (case-2 full refresh): they
+    # have no stable PK to upsert against, so a real net-change delta token would only
+    # produce duplicate/unmergeable rows. True delta requires a stable PK + persisted token
+    # (see the comment on work_activity_net_changes in resources.py). Until then, both
+    # DATE_WINDOW and NET_CHANGE just read [since, now] and full-REPLACE.
+    if resource.incremental_style in _WINDOWED_STYLES and since_iso and until_iso:
         start = datetime.fromisoformat(since_iso)
         end = datetime.fromisoformat(until_iso)
         for w_start, w_end in split_date_windows(start, end):
             yield from chunk_and_read(
                 client, resource, emp_ids, w_start.isoformat(), w_end.isoformat(), select
             )
-    elif resource.incremental_style == IncrementalStyle.NET_CHANGE:
-        body_token = net_change_token or ""
-        for chunk in _initial_chunks(emp_ids, resource.batch_limit or 50):
-            body = _build_body(resource, chunk, "", "", select)
-            body["netChangeToken"] = body_token
-            yield from paginate_multi_read(client, resource, body)
     else:
         yield from chunk_and_read(client, resource, emp_ids, since_iso or "", until_iso or "", select)

@@ -1,6 +1,6 @@
 import requests_mock
 
-from client.orchestration import chunk_and_read, paginate_multi_read, resolve_employee_ids
+from client.orchestration import chunk_and_read, iter_records, paginate_multi_read, resolve_employee_ids
 from client.resources import get_resource
 from client.wfm_client import WfmClient
 
@@ -46,3 +46,31 @@ def test_chunk_and_read_shrinks_on_413():
         m.post(url, responses)
         rows = list(chunk_and_read(c, res, list(range(50)), "2026-01-01", "2026-02-01", []))
         assert {r["id"] for r in rows} == {1, 2}
+
+
+def test_net_change_runs_as_date_window_without_token():
+    """I1: keyless net_change is a full refresh -- it must send a dateRange window and
+    must NOT send a netChangeToken (the inert token path is removed)."""
+    res = get_resource("work_activity_net_changes")
+    captured: list[dict] = []
+    with requests_mock.Mocker() as m:
+        c = _client(m)
+        m.post(f"{HOST}/api/v1/commons/hyperfind/execute", json={"result": [{"id": 7}]})
+
+        def _capture(request, context):
+            captured.append(request.json())
+            return {"records": [{"id": 1}]}
+
+        m.post(f"{HOST}/api/v1{res.endpoint_path}", json=_capture)
+        rows = list(
+            iter_records(
+                c, res, hyperfind_ref="AllHome",
+                since_iso="2026-01-01T00:00:00+00:00", until_iso="2026-02-01T00:00:00+00:00",
+                select=[],
+            )
+        )
+    assert [r["id"] for r in rows] == [1]
+    assert captured, "net_change resource issued no multi_read call"
+    body = captured[0]
+    assert "netChangeToken" not in body
+    assert body["where"]["dateRange"]["startDate"] == "2026-01-01T00:00:00+00:00"

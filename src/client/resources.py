@@ -17,6 +17,11 @@ class PaginationStyle(StrEnum):
 class IncrementalStyle(StrEnum):
     DATE_WINDOW = "date_window"
     SYMBOLIC_PERIOD = "symbolic_period"
+    # NET_CHANGE currently behaves identically to DATE_WINDOW (full refresh). True
+    # net-change delta accumulation needs a stable primary key to upsert deltas against
+    # plus round-tripping the API's net-change token through state. The net-change
+    # resources below have neither, so a real delta would corrupt the table. Enabling
+    # true delta is a future registry edit: add a PK + wire token persistence.
     NET_CHANGE = "net_change"
     ASYNC_EXPORT = "async_export"
     NONE = "none"
@@ -130,6 +135,8 @@ RESOURCE_REGISTRY: dict[str, ResourceDef] = {
         "attestations", "attestations", "/attestation/process_profiles/multi_read"
     ),
     "work_activities": _date_window("work_activities", "work", "/activities/multi_read"),
+    # No stable PK -> runs as a case-2 full refresh (date window + REPLACE), NOT a true
+    # net-change delta. See IncrementalStyle.NET_CHANGE for what enabling real delta needs.
     "work_activity_net_changes": ResourceDef(
         name="work_activity_net_changes", family="work", method=HttpMethod.POST,
         endpoint_path="/activities/net_changes/multi_read",
