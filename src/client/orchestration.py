@@ -3,7 +3,7 @@ from collections.abc import Iterator
 from datetime import datetime
 from typing import Any
 
-from client.resources import EmployeeScope, IncrementalStyle, PaginationStyle, ResourceDef
+from client.resources import EmployeeScope, HttpMethod, IncrementalStyle, PaginationStyle, ResourceDef
 from client.wfm_client import PayloadTooLargeError, WfmClient
 from client.window import split_date_windows
 
@@ -24,7 +24,10 @@ def resolve_employee_ids(client: WfmClient, hyperfind_ref: str | None) -> list[i
 
 def paginate_multi_read(client: WfmClient, resource: ResourceDef, body: dict) -> Iterator[dict]:
     if resource.pagination != PaginationStyle.MULTI_READ:
-        result = client.post_json(resource.endpoint_path, body)
+        if resource.method == HttpMethod.GET:
+            result = client.get_json(resource.endpoint_path)
+        else:
+            result = client.post_json(resource.endpoint_path, body)
         yield from _extract_records(result)
         return
     index = 0

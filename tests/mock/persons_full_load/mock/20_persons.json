@@ -1,0 +1,8 @@
+{
+  "url": "https://acme.prd.mykronos.com/api/v1/commons/persons/multi_read",
+  "method": "POST",
+  "json": {"records": [
+    {"personIdentity": {"personNumber": "1001"}, "firstName": "Ada", "lastName": "Lovelace"},
+    {"personIdentity": {"personNumber": "1002"}, "firstName": "Alan", "lastName": "Turing"}
+  ]}
+}
