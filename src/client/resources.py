@@ -161,3 +161,19 @@ def get_resource(name: str) -> ResourceDef:
         raise UserException(
             f"Unknown resource '{name}'. Valid resources: {', '.join(RESOURCE_REGISTRY)}"
         ) from e
+
+
+def effective_incremental(resource: ResourceDef, incremental_load: bool) -> bool:
+    """Single source of truth for whether a run is *effectively* incremental.
+
+    A run behaves incrementally (append/upsert with PK dedup, a state watermark, and
+    a [last_run - overlap, now] window) ONLY when the user selected incremental_load
+    AND the resource has a stable primary key to upsert against.
+
+    Without a PK, an incremental append would duplicate rows unboundedly, so such a
+    resource must run as a full REPLACE every run (case-2 full refresh) regardless of
+    the configured load type. This one predicate governs all three of: reading/advancing
+    the state watermark, computing the fetch window, and the manifest `incremental` flag.
+    They must never disagree.
+    """
+    return incremental_load and bool(resource.primary_key)

@@ -11,10 +11,10 @@ from keboola.component.exceptions import UserException
 
 from client.orchestration import iter_records
 from client.payroll import run_async_export
-from client.resources import IncrementalStyle, ResourceDef, get_resource
+from client.resources import IncrementalStyle, ResourceDef, effective_incremental, get_resource
 from client.transform import flatten_record
 from client.wfm_client import WfmClient
-from client.window import STATE_LAST_RUN, compute_window
+from client.window import STATE_LAST_RUN, resolve_window
 from configuration import Configuration
 
 _TIMESTAMP_FIELDS = {
@@ -44,7 +44,7 @@ class Component(ComponentBase):
         row_count, columns = self._stream_and_write_table(resource, record_iter)
         if row_count == 0:
             logging.info("No rows returned for resource '%s'; skipping table write.", resource.name)
-        if self._is_incremental(resource):
+        if self._effective_incremental(resource):
             # Advance watermark even on empty result to prevent unbounded window growth.
             self.write_state_file({STATE_LAST_RUN: run_started})
         if row_count:
@@ -52,20 +52,24 @@ class Component(ComponentBase):
                 "Extracted resource '%s': %s rows, %s columns.", resource.name, row_count, len(columns)
             )
 
-    def _is_incremental(self, resource: ResourceDef) -> bool:
-        return self._config.incremental and resource.incremental_style != IncrementalStyle.NONE
+    def _effective_incremental(self, resource: ResourceDef) -> bool:
+        """The one predicate governing watermark, fetch window, and manifest flag (see resources)."""
+        return effective_incremental(resource, self._config.incremental)
 
     def _compute_window(
         self, resource: ResourceDef, state: dict[str, Any]
     ) -> tuple[str | None, str | None, str]:
         """Return (since_iso, until_iso, run_started_iso)."""
-        if self._is_incremental(resource) and resource.date_field:
-            date_field = self._config.date_field or resource.date_field
-            params, run_started = compute_window(
-                state, date_field, self._config.since, self._config.overlap_margin_seconds
-            )
-            return params.get(f"{date_field}_since"), params.get(f"{date_field}_until"), run_started
-        return None, None, datetime.now(UTC).isoformat()
+        date_field = self._config.date_field or resource.date_field
+        if not date_field:
+            return None, None, datetime.now(UTC).isoformat()
+        return resolve_window(
+            state,
+            date_field,
+            self._config.since,
+            self._config.overlap_margin_seconds,
+            self._effective_incremental(resource),
+        )
 
     def _record_source(
         self, resource: ResourceDef, since_iso: str | None, until_iso: str | None
@@ -145,9 +149,9 @@ class Component(ComponentBase):
                 )
                 for col in columns
             }
-            # Incremental only with a stable PK; a keyless resource must run full-load
-            # (incremental-without-PK appends unboundedly).
-            is_incremental = self._is_incremental(resource) and bool(resource.primary_key)
+            # Same predicate as the watermark and window logic: incremental append/upsert
+            # only with a stable PK; a keyless resource always full-REPLACEs.
+            is_incremental = self._effective_incremental(resource)
             table = self.create_out_table_definition(
                 f"{resource.name}.csv",
                 primary_key=resource.primary_key,
