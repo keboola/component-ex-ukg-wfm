@@ -1,0 +1,13 @@
+interactions:
+- request:
+    method: POST
+    uri: https://acme.prd.mykronos.com/api/authentication/access_token
+    body: null
+    headers: {}
+  response:
+    status: {code: 401, message: Unauthorized}
+    headers:
+      Content-Type: [application/json]
+    body:
+      string: '{"error": "invalid_grant", "error_description": "Authentication failed for the supplied service account."}'
+version: 1

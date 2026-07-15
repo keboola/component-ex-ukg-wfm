@@ -1,0 +1,35 @@
+interactions:
+- request:
+    method: POST
+    uri: https://acme.prd.mykronos.com/api/authentication/access_token
+    body: null
+    headers: {}
+  response:
+    status: {code: 200, message: OK}
+    headers:
+      Content-Type: [application/json]
+    body:
+      string: '{"access_token": "SYNTHETIC_TOKEN", "refresh_token": "SYNTHETIC_REFRESH", "expires_in": 3600}'
+- request:
+    method: POST
+    uri: https://acme.prd.mykronos.com/api/v1/commons/hyperfind/execute
+    body: null
+    headers: {}
+  response:
+    status: {code: 200, message: OK}
+    headers:
+      Content-Type: [application/json]
+    body:
+      string: '{"result": [{"id": 201}, {"id": 202}]}'
+- request:
+    method: POST
+    uri: https://acme.prd.mykronos.com/api/v1/scheduling/shifts/multi_read
+    body: null
+    headers: {}
+  response:
+    status: {code: 200, message: OK}
+    headers:
+      Content-Type: [application/json]
+    body:
+      string: '{"records": [{"id": "s1", "employeeId": 201, "startDateTime": "2026-06-12T09:00:00", "endDateTime": "2026-06-12T17:00:00"}, {"id": "s2", "employeeId": 202, "startDateTime": "2026-06-12T12:00:00", "endDateTime": "2026-06-12T20:00:00"}]}'
+version: 1
