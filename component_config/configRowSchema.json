@@ -1,1 +1,223 @@
-{}
+{
+  "type": "object",
+  "title": "Resource Configuration",
+  "required": ["resource", "load_type"],
+  "properties": {
+    "resource": {
+      "type": "string",
+      "title": "Resource",
+      "description": "UKG Pro WFM resource to extract (one resource per configuration row).",
+      "enum": [
+        "persons",
+        "business_structure",
+        "hyperfind_queries",
+        "information_access",
+        "timekeeping_punches",
+        "timekeeping_timecards",
+        "timekeeping_timecard_metrics",
+        "scheduling_schedules",
+        "scheduling_shifts",
+        "scheduling_open_shifts",
+        "scheduling_swaps",
+        "accruals_balances",
+        "accruals_transactions",
+        "accruals_summaries",
+        "leave_cases",
+        "leave_edits",
+        "leave_requests",
+        "attendance_records",
+        "attendance_patterns",
+        "attendance_events",
+        "attestations",
+        "work_activities",
+        "work_activity_net_changes",
+        "payroll_export",
+        "forecasting"
+      ],
+      "options": {
+        "enum_titles": [
+          "People / Persons",
+          "Business Structure",
+          "Hyperfind Queries",
+          "Information Access (generic metrics)",
+          "Timekeeping — Punches",
+          "Timekeeping — Timecards",
+          "Timekeeping — Timecard Metrics",
+          "Scheduling — Schedules",
+          "Scheduling — Shifts",
+          "Scheduling — Open Shifts",
+          "Scheduling — Swaps",
+          "Accruals — Balances",
+          "Accruals — Transactions",
+          "Accruals — Summaries",
+          "Leave — Cases",
+          "Leave — Edits",
+          "Leave — Requests",
+          "Attendance — Records",
+          "Attendance — Patterns",
+          "Attendance — Events",
+          "Attestations",
+          "Work / Activities",
+          "Work / Activities — Net Changes (delta)",
+          "Payroll Export (async)",
+          "Forecasting (labor/volume)"
+        ]
+      },
+      "propertyOrder": 10
+    },
+    "load_type": {
+      "type": "string",
+      "title": "Load Type",
+      "description": "Full load replaces all data; incremental load appends new records within a moving date window. Resources without a stable primary key always run full-load.",
+      "enum": ["full_load", "incremental_load"],
+      "options": {
+        "enum_titles": ["Full Load", "Incremental Load"]
+      },
+      "default": "incremental_load",
+      "propertyOrder": 20
+    },
+    "since": {
+      "type": "string",
+      "title": "Start Date",
+      "description": "Lower bound for the first incremental run. ISO 8601 (e.g. `2026-01-01T00:00:00+00:00`) or a relative phrase (e.g. `30 days ago`, `yesterday`). Ignored once a state watermark exists.",
+      "options": {
+        "dependencies": {
+          "load_type": "incremental_load"
+        }
+      },
+      "propertyOrder": 30
+    },
+    "overlap_margin_seconds": {
+      "type": "integer",
+      "title": "Overlap Margin (seconds)",
+      "description": "Seconds subtracted from the last watermark to re-capture late-arriving / retro-edited records.",
+      "default": 0,
+      "minimum": 0,
+      "options": {
+        "dependencies": {
+          "load_type": "incremental_load"
+        }
+      },
+      "propertyOrder": 40
+    },
+    "hyperfind_ref": {
+      "type": "string",
+      "title": "Hyperfind Query",
+      "description": "Hyperfind query id/name that resolves the employee-ID set for this resource. Leave empty to use the tenant's 'All Home' default.",
+      "options": {
+        "dependencies": {
+          "resource": [
+            "persons",
+            "information_access",
+            "timekeeping_punches",
+            "timekeeping_timecards",
+            "timekeeping_timecard_metrics",
+            "scheduling_schedules",
+            "scheduling_shifts",
+            "scheduling_open_shifts",
+            "scheduling_swaps",
+            "accruals_balances",
+            "accruals_transactions",
+            "accruals_summaries",
+            "leave_cases",
+            "leave_edits",
+            "leave_requests",
+            "attendance_records",
+            "attendance_patterns",
+            "attendance_events",
+            "attestations",
+            "work_activities",
+            "work_activity_net_changes",
+            "payroll_export"
+          ]
+        }
+      },
+      "propertyOrder": 50
+    },
+    "select": {
+      "type": "array",
+      "title": "Select Fields",
+      "description": "Optional list of API 'select' elements to request. Leave empty to use the resource default.",
+      "items": {
+        "type": "string"
+      },
+      "options": {
+        "dependencies": {
+          "resource": [
+            "persons",
+            "information_access",
+            "timekeeping_punches",
+            "timekeeping_timecards",
+            "timekeeping_timecard_metrics",
+            "scheduling_schedules",
+            "scheduling_shifts",
+            "scheduling_open_shifts",
+            "scheduling_swaps",
+            "accruals_balances",
+            "accruals_transactions",
+            "accruals_summaries",
+            "leave_cases",
+            "leave_edits",
+            "leave_requests",
+            "attendance_records",
+            "attendance_patterns",
+            "attendance_events",
+            "attestations",
+            "work_activities",
+            "work_activity_net_changes",
+            "payroll_export"
+          ]
+        }
+      },
+      "propertyOrder": 60
+    },
+    "symbolic_period": {
+      "type": "string",
+      "title": "Symbolic Period",
+      "description": "Optional symbolic period (e.g. `Current Pay Period`) for resources that support period-based reads instead of an explicit date window.",
+      "options": {
+        "dependencies": {
+          "load_type": "incremental_load"
+        }
+      },
+      "propertyOrder": 70
+    },
+    "date_field": {
+      "type": "string",
+      "title": "Date Field Override",
+      "description": "Advanced: override the datetime field used for the incremental window. Leave empty to use the resource default.",
+      "options": {
+        "dependencies": {
+          "load_type": "incremental_load"
+        }
+      },
+      "propertyOrder": 80
+    },
+    "max_wait_seconds": {
+      "type": "integer",
+      "title": "Payroll Max Wait (seconds)",
+      "description": "Maximum time to poll a Payroll async export before failing (avoids hanging).",
+      "default": 1800,
+      "minimum": 1,
+      "options": {
+        "dependencies": {
+          "resource": "payroll_export"
+        }
+      },
+      "propertyOrder": 90
+    },
+    "poll_interval_seconds": {
+      "type": "integer",
+      "title": "Payroll Poll Interval (seconds)",
+      "description": "Seconds between Payroll async export status polls.",
+      "default": 15,
+      "minimum": 1,
+      "options": {
+        "dependencies": {
+          "resource": "payroll_export"
+        }
+      },
+      "propertyOrder": 100
+    }
+  }
+}

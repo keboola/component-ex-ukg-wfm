@@ -1,19 +1,46 @@
 {
   "type": "object",
-  "title": "extractor configuration",
-  "required": [
-    "print_hello"
-  ],
+  "title": "UKG Pro WFM Extractor Configuration",
+  "required": ["host", "#client_id", "#client_secret", "#username", "#password"],
   "properties": {
-    "print_hello": {
-      "type": "boolean",
-      "title": "Print Hello",
-      "propertyOrder": 1
+    "host": {
+      "type": "string",
+      "title": "Tenant Host URL",
+      "description": "Full tenant vanity URL, e.g. https://acme.prd.mykronos.com (no trailing path).",
+      "propertyOrder": 10
     },
-    "debug": {
-      "type": "boolean",
-      "title": "Debug",
-      "propertyOrder": 2
+    "#client_id": {
+      "type": "string",
+      "format": "password",
+      "title": "Client ID",
+      "description": "OAuth client id minted by UKG at tenant provisioning.",
+      "propertyOrder": 20
+    },
+    "#client_secret": {
+      "type": "string",
+      "format": "password",
+      "title": "Client Secret",
+      "description": "OAuth client secret minted by UKG at tenant provisioning.",
+      "propertyOrder": 30
+    },
+    "#username": {
+      "type": "string",
+      "format": "password",
+      "title": "Service Account Username",
+      "description": "Username of the dedicated WFM service account (password grant).",
+      "propertyOrder": 40
+    },
+    "#password": {
+      "type": "string",
+      "format": "password",
+      "title": "Service Account Password",
+      "description": "Password of the dedicated WFM service account.",
+      "propertyOrder": 50
+    },
+    "test_connection": {
+      "type": "button",
+      "format": "test-connection",
+      "propertyOrder": 100
     }
   }
 }
