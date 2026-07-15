@@ -1,0 +1,8 @@
+{
+  "url": "https://acme.prd.mykronos.com/api/v1/payroll/export/J1/status",
+  "method": "GET",
+  "responses": [
+    {"json": {"status": "IN_PROGRESS"}},
+    {"json": {"status": "COMPLETED", "downloadUrl": "https://acme.prd.mykronos.com/api/v1/payroll/export/J1/file"}}
+  ]
+}

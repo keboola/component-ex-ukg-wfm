@@ -1,0 +1,5 @@
+{
+  "url": "https://acme.prd.mykronos.com/api/v1/payroll/export",
+  "method": "POST",
+  "json": {"id": "J1"}
+}

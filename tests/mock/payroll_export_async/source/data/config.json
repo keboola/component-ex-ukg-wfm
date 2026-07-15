@@ -1,0 +1,15 @@
+{
+  "parameters": {
+    "host": "https://acme.prd.mykronos.com",
+    "#client_id": "cid",
+    "#client_secret": "csec",
+    "#username": "svc_user",
+    "#password": "pw",
+    "resource": "payroll_export",
+    "load_type": "incremental_load",
+    "since": "30 days ago",
+    "hyperfind_ref": "AllHome",
+    "poll_interval_seconds": 1,
+    "max_wait_seconds": 600
+  }
+}

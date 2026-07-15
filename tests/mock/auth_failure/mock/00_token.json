@@ -1,0 +1,6 @@
+{
+  "url": "https://acme.prd.mykronos.com/api/authentication/access_token",
+  "method": "POST",
+  "status_code": 401,
+  "json": {"message": "bad creds"}
+}

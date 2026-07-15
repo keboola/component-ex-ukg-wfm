@@ -1,0 +1,12 @@
+{
+  "parameters": {
+    "host": "https://acme.prd.mykronos.com",
+    "#client_id": "cid",
+    "#client_secret": "csec",
+    "#username": "svc_user",
+    "#password": "pw",
+    "resource": "work_activity_net_changes",
+    "load_type": "incremental_load",
+    "hyperfind_ref": "AllHome"
+  }
+}

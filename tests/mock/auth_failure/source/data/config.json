@@ -1,0 +1,11 @@
+{
+  "parameters": {
+    "host": "https://acme.prd.mykronos.com",
+    "#client_id": "bad_cid",
+    "#client_secret": "bad_csec",
+    "#username": "bad_user",
+    "#password": "bad_pw",
+    "resource": "persons",
+    "load_type": "full_load"
+  }
+}

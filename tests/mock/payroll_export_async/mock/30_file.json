@@ -1,0 +1,8 @@
+{
+  "url": "https://acme.prd.mykronos.com/api/v1/payroll/export/J1/file",
+  "method": "GET",
+  "json": {"records": [
+    {"id": 1, "gross": "100"},
+    {"id": 2, "gross": "200"}
+  ]}
+}
