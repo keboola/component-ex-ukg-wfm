@@ -60,6 +60,9 @@ class Component(ComponentBase):
         self, resource: ResourceDef, state: dict[str, Any]
     ) -> tuple[str | None, str | None, str]:
         """Return (since_iso, until_iso, run_started_iso)."""
+        # A symbolic period replaces the date window; skip window and watermark logic.
+        if self._config.symbolic_period:
+            return None, None, datetime.now(UTC).isoformat()
         date_field = self._config.date_field or resource.date_field
         if not date_field:
             return None, None, datetime.now(UTC).isoformat()
@@ -86,6 +89,7 @@ class Component(ComponentBase):
             hyperfind_ref=self._config.hyperfind_ref,
             since_iso=since_iso, until_iso=until_iso,
             select=self._config.select,
+            symbolic_period=self._config.symbolic_period,
         )
 
     def _stream_and_write_table(

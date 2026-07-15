@@ -57,21 +57,24 @@ def chunk_and_read(
     since_iso: str,
     until_iso: str,
     select: list[str],
+    symbolic_period: str | None = None,
 ) -> Iterator[dict]:
     chunk_size = resource.batch_limit or len(emp_ids) or 1
     chunks = _initial_chunks(emp_ids, chunk_size) if emp_ids else [[]]
     for chunk in chunks:
-        yield from _read_chunk_with_shrink(client, resource, chunk, since_iso, until_iso, select)
+        yield from _read_chunk_with_shrink(
+            client, resource, chunk, since_iso, until_iso, select, symbolic_period
+        )
 
 
 def _read_chunk_with_shrink(
     client: WfmClient, resource: ResourceDef, chunk: list[int],
-    since_iso: str, until_iso: str, select: list[str],
+    since_iso: str, until_iso: str, select: list[str], symbolic_period: str | None = None,
 ) -> Iterator[dict]:
     size = len(chunk) or 1
     while True:
         try:
-            body = _build_body(resource, chunk, since_iso, until_iso, select)
+            body = _build_body(resource, chunk, since_iso, until_iso, select, symbolic_period)
             yield from paginate_multi_read(client, resource, body)
             return
         except PayloadTooLargeError:
@@ -81,7 +84,9 @@ def _read_chunk_with_shrink(
             logging.warning("413 on %s; shrinking chunk to %s employees.", resource.name, size)
             # Re-run the sub-chunks at the smaller size.
             for sub in _initial_chunks(chunk, size):
-                yield from _read_chunk_with_shrink(client, resource, sub, since_iso, until_iso, select)
+                yield from _read_chunk_with_shrink(
+                    client, resource, sub, since_iso, until_iso, select, symbolic_period
+                )
             return
 
 
@@ -90,14 +95,18 @@ def _initial_chunks(items: list[int], size: int) -> list[list[int]]:
 
 
 def _build_body(
-    resource: ResourceDef, chunk: list[int], since_iso: str, until_iso: str, select: list[str]
+    resource: ResourceDef, chunk: list[int], since_iso: str, until_iso: str, select: list[str],
+    symbolic_period: str | None = None,
 ) -> dict[str, Any]:
     body: dict[str, Any] = dict(resource.body_template)
     if select or resource.select:
         body["select"] = select or resource.select
     if chunk:
         body["where"] = {"employees": {"ids": chunk}}
-    if resource.date_field and since_iso and until_iso:
+    if symbolic_period:
+        # Symbolic period (e.g. "Current Pay Period") replaces the explicit date window.
+        body.setdefault("where", {})["symbolicPeriod"] = {"qualifier": symbolic_period}
+    elif resource.date_field and since_iso and until_iso:
         body.setdefault("where", {})["dateRange"] = {"startDate": since_iso, "endDate": until_iso}
     return body
 
@@ -124,10 +133,17 @@ def iter_records(
     since_iso: str | None,
     until_iso: str | None,
     select: list[str],
+    symbolic_period: str | None = None,
 ) -> Iterator[dict]:
     emp_ids: list[int] = []
     if resource.employee_scope == EmployeeScope.HYPERFIND:
         emp_ids = resolve_employee_ids(client, hyperfind_ref)
+
+    # A symbolic period (e.g. "Current Pay Period") replaces the date window entirely; the
+    # caller has already skipped window/watermark logic, so read once with the symbolic bound.
+    if symbolic_period:
+        yield from chunk_and_read(client, resource, emp_ids, "", "", select, symbolic_period)
+        return
 
     # NET_CHANGE resources are treated as a plain date window (case-2 full refresh): they
     # have no stable PK to upsert against, so a real net-change delta token would only

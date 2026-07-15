@@ -74,3 +74,30 @@ def test_net_change_runs_as_date_window_without_token():
     body = captured[0]
     assert "netChangeToken" not in body
     assert body["where"]["dateRange"]["startDate"] == "2026-01-01T00:00:00+00:00"
+
+
+def test_symbolic_period_replaces_date_window():
+    """I2: when a symbolic period is set, the request sends where.symbolicPeriod and
+    omits the date window entirely (window/watermark logic is skipped upstream)."""
+    res = get_resource("scheduling_shifts")
+    captured: list[dict] = []
+    with requests_mock.Mocker() as m:
+        c = _client(m)
+        m.post(f"{HOST}/api/v1/commons/hyperfind/execute", json={"result": [{"id": 7}]})
+
+        def _capture(request, context):
+            captured.append(request.json())
+            return {"records": [{"id": 1}]}
+
+        m.post(f"{HOST}/api/v1{res.endpoint_path}", json=_capture)
+        rows = list(
+            iter_records(
+                c, res, hyperfind_ref="AllHome",
+                since_iso=None, until_iso=None, select=[],
+                symbolic_period="Current Pay Period",
+            )
+        )
+    assert [r["id"] for r in rows] == [1]
+    body = captured[0]
+    assert body["where"]["symbolicPeriod"] == {"qualifier": "Current Pay Period"}
+    assert "dateRange" not in body["where"]
