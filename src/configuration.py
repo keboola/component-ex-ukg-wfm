@@ -1,26 +1,48 @@
-import logging
+from enum import StrEnum
+from typing import Any
 
 from keboola.component.exceptions import UserException
-from pydantic import BaseModel, Field, ValidationError, field_validator
+from pydantic import BaseModel, Field, ValidationError, computed_field
+
+
+class LoadType(StrEnum):
+    FULL = "full_load"
+    INCREMENTAL = "incremental_load"
 
 
 class Configuration(BaseModel):
-    print_hello: bool
-    api_token: str = Field(alias="#api_token")
-    debug: bool = False
+    model_config = {"extra": "ignore", "populate_by_name": True}
 
-    def __init__(self, **data):
+    # --- root (global auth) ---
+    host: str
+    client_id: str = Field(alias="#client_id")
+    client_secret: str = Field(alias="#client_secret")
+    username: str = Field(alias="#username")
+    password: str = Field(alias="#password")
+
+    # --- row (per resource) ---
+    resource: str | None = None
+    load_type: LoadType = LoadType.INCREMENTAL
+    since: str | None = None
+    overlap_margin_seconds: int = Field(default=0, ge=0)
+    symbolic_period: str | None = None
+    hyperfind_ref: str | None = None
+    select: list[str] = Field(default_factory=list)
+    date_field: str | None = None
+    max_wait_seconds: int = Field(default=1800, ge=1)
+    poll_interval_seconds: int = Field(default=15, ge=1)
+
+    def __init__(self, **data: Any):
         try:
             super().__init__(**data)
         except ValidationError as e:
-            error_messages = [f"{err['loc'][0]}: {err['msg']}" for err in e.errors()]
-            raise UserException(f"Validation Error: {', '.join(error_messages)}")
+            messages = [
+                f"{err['loc'][0] if err['loc'] else 'unknown'}: {err['msg']}"
+                for err in e.errors()
+            ]
+            raise UserException(f"Validation Error: {', '.join(messages)}") from e
 
-        if self.debug:
-            logging.debug("Component will run in Debug mode")
-
-    @field_validator("api_token")
-    def token_must_be_uppercase(cls, v):
-        if not v.isupper():
-            raise UserException("API token must be uppercase")
-        return v
+    @computed_field
+    @property
+    def incremental(self) -> bool:
+        return self.load_type == LoadType.INCREMENTAL
