@@ -48,7 +48,7 @@ Supported resources
 | Leave | `leave_cases`, `leave_edits`, `leave_requests` |
 | Attendance | `attendance_records`, `attendance_patterns`, `attendance_events` |
 | Attestations | `attestations` |
-| Work / Activities | `work_activities`, `work_activity_net_changes` (delta) |
+| Work / Activities | `work_activities`, `work_activity_net_changes` |
 | Payroll | `payroll_export` (async submit → poll → download) |
 | Forecasting | `forecasting` |
 
@@ -60,8 +60,11 @@ Incremental & windowing
 - The window is split into **≤365-day sub-windows** to respect service limits; employee sets are
   chunked by each resource's per-call batch limit (≤500 for most, 100 for persons, 50 for activity
   net-changes) and adaptively **halved on HTTP 413**.
-- Net-change resources use their delta token instead of a date window.
-- The watermark advances **even on an empty result** to prevent unbounded window growth.
+- Net-change resources currently run as a date-windowed full **replace** (like other keyless
+  resources); true net-change delta is deferred until a resource gains a stable primary key and
+  persisted change-token.
+- For effectively-incremental resources the watermark advances **even on an empty result** to prevent
+  unbounded window growth.
 - **Incremental requires a stable primary key.** Resources without one always run full-load
   (incremental-without-PK would append unboundedly).
 
