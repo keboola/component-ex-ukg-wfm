@@ -5,7 +5,7 @@ from typing import Any
 
 from keboola.component.exceptions import UserException
 
-from client.orchestration import _extract_records
+from client.orchestration import extract_records
 from client.resources import ResourceDef
 from client.wfm_client import WfmClient
 
@@ -53,7 +53,7 @@ def run_async_export(
         waited += poll_interval_s
 
     if not download_url:
-        download_url = f"{client._api_base}{resource.endpoint_path}/{job_id}/file"
-    resp = client.request_raw("GET", download_url, stream=True)
+        download_url = f"{client.api_base}{resource.endpoint_path}/{job_id}/file"
+    resp = client.request_raw("GET", download_url)
     resp.raise_for_status()
-    yield from _extract_records(resp.json())
+    yield from extract_records(resp.json())

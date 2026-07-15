@@ -86,6 +86,11 @@ class WfmClient:
         logging.info("Obtained UKG WFM OAuth token (expires in %ss).", expires_in)
         return self._token
 
+    @property
+    def api_base(self) -> str:
+        """Public base URL (``https://<host>/api/v1``) for callers building raw download URLs."""
+        return self._api_base
+
     def post_json(self, path: str, body: dict) -> Any:
         return self._call("POST", f"{self._api_base}{path}", json_body=body)
 

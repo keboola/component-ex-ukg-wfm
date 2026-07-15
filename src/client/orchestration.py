@@ -28,7 +28,7 @@ def paginate_multi_read(client: WfmClient, resource: ResourceDef, body: dict) ->
             result = client.get_json(resource.endpoint_path)
         else:
             result = client.post_json(resource.endpoint_path, body)
-        yield from _extract_records(result)
+        yield from extract_records(result)
         return
     index = 0
     pages = 0
@@ -41,7 +41,7 @@ def paginate_multi_read(client: WfmClient, resource: ResourceDef, body: dict) ->
             page_body["cacheKey"] = cache_key
             page_body["index"] = index
         result = client.post_json(resource.endpoint_path, page_body)
-        records = _extract_records(result)
+        records = extract_records(result)
         yield from records
         count = page_body["count"]
         cache_key = result.get("cacheKey") if isinstance(result, dict) else None
@@ -111,7 +111,7 @@ def _build_body(
     return body
 
 
-def _extract_records(result: Any) -> list[dict]:
+def extract_records(result: Any) -> list[dict]:
     if isinstance(result, dict):
         for key in ("records", "result", "data"):
             if isinstance(result.get(key), list):
