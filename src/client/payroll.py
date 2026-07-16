@@ -1,13 +1,18 @@
+import json
 import logging
+import tempfile
 import time
 from collections.abc import Callable, Iterator
 from typing import Any
 
+import requests
 from keboola.component.exceptions import UserException
 
 from client.orchestration import extract_records
 from client.resources import ResourceDef
 from client.wfm_client import WfmClient
+
+_DOWNLOAD_CHUNK_BYTES = 1 << 16
 
 _TERMINAL_OK = {"COMPLETED", "SUCCEEDED", "DONE"}
 _TERMINAL_FAIL = {"FAILED", "CANCELLED", "ERROR"}
@@ -54,6 +59,28 @@ def run_async_export(
 
     if not download_url:
         download_url = f"{client.api_base}{resource.endpoint_path}/{job_id}/file"
-    resp = client.request_raw("GET", download_url)
-    resp.raise_for_status()
-    yield from extract_records(resp.json())
+    yield from _download_and_parse(client, download_url, job_id)
+
+
+def _download_and_parse(client: WfmClient, download_url: str, job_id: str) -> Iterator[dict[str, Any]]:
+    """Stream the export body to a /tmp scratch file, then parse and yield rows.
+
+    The raw HTTP body is streamed to disk in chunks (never buffered whole in RAM); the
+    scratch file lives in /tmp (tempfile default), never under data/out/tables/. Both the
+    download and the parse are wrapped so a transport or malformed-body failure surfaces as
+    a UserException (exit 1) rather than escaping as a bare exception (exit 2).
+    """
+    try:
+        with tempfile.NamedTemporaryFile(mode="w+b", suffix=".json") as tmp:
+            resp = client.request_raw("GET", download_url, stream=True)
+            resp.raise_for_status()
+            for chunk in resp.iter_content(chunk_size=_DOWNLOAD_CHUNK_BYTES):
+                if chunk:
+                    tmp.write(chunk)
+            tmp.seek(0)
+            payload = json.load(tmp)
+    except (requests.RequestException, ValueError) as e:
+        raise UserException(
+            f"Payroll export {job_id} download/parse failed: {type(e).__name__}"
+        ) from e
+    yield from extract_records(payload)
