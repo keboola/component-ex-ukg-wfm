@@ -45,7 +45,6 @@ class ResourceDef(BaseModel):
     incremental_style: IncrementalStyle = IncrementalStyle.NONE
     date_field: str | None = None
     primary_key: list[str] = Field(default_factory=list)
-    confirmed: bool = True
 
 
 def _date_window(name: str, family: str, endpoint_path: str) -> ResourceDef:
