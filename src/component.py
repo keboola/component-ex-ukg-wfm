@@ -17,6 +17,19 @@ from client.wfm_client import WfmClient
 from client.window import STATE_LAST_RUN, resolve_window
 from configuration import Configuration
 
+# Baseline recording sanitizer: DefaultSanitizer strips the Authorization header and the known
+# credential fields (client_id, client_secret, password, token, access_token, refresh_token) from
+# recorded cassettes; `username` is a WFM credential the default list misses. Host rewriting and any
+# employee-PII field redaction are added deliberately after reviewing the first recording.
+# keboola.vcr is a dev-only dependency (via keboola.datadirtest); the production image is built with
+# `uv sync --no-dev`, so guard the import — VCR_SANITIZERS is only consumed by the recording harness.
+try:
+    from keboola.vcr import DefaultSanitizer
+
+    VCR_SANITIZERS = [DefaultSanitizer(additional_sensitive_fields=["username"])]
+except ImportError:
+    VCR_SANITIZERS = []
+
 _TIMESTAMP_FIELDS = {
     "createdDateTime",
     "updatedDateTime",

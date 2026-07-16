@@ -19,6 +19,11 @@ tests/mock/*/source/data/out/
 tests/mock/*/source/data/in/*
 !tests/mock/*/source/data/in/state.json
 
+# WFM VCR recordings are from a REAL customer prod instance — DO NOT COMMIT until
+# sanitized (VCR_SANITIZERS) AND manually reviewed for leftover sensitive data.
+tests/functional/
+tests/setup/configs.json
+
 # build lifecycle tracker (local only, never commit)
 docs/superpowers/*-lifecycle.md
 .claude/loop.md
