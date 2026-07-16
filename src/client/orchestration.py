@@ -22,7 +22,9 @@ def resolve_employee_ids(client: WfmClient, hyperfind_ref: str | None) -> list[i
     return [r["id"] for r in rows if "id" in r]
 
 
-def paginate_multi_read(client: WfmClient, resource: ResourceDef, body: dict) -> Iterator[dict]:
+def paginate_multi_read(
+    client: WfmClient, resource: ResourceDef, body: dict[str, Any]
+) -> Iterator[dict[str, Any]]:
     if resource.pagination != PaginationStyle.MULTI_READ:
         if resource.method == HttpMethod.GET:
             result = client.get_json(resource.endpoint_path)
@@ -58,7 +60,7 @@ def chunk_and_read(
     until_iso: str,
     select: list[str],
     symbolic_period: str | None = None,
-) -> Iterator[dict]:
+) -> Iterator[dict[str, Any]]:
     chunk_size = resource.batch_limit or len(emp_ids) or 1
     chunks = _initial_chunks(emp_ids, chunk_size) if emp_ids else [[]]
     for chunk in chunks:
@@ -70,7 +72,7 @@ def chunk_and_read(
 def _read_chunk_with_shrink(
     client: WfmClient, resource: ResourceDef, chunk: list[int],
     since_iso: str, until_iso: str, select: list[str], symbolic_period: str | None = None,
-) -> Iterator[dict]:
+) -> Iterator[dict[str, Any]]:
     size = len(chunk) or 1
     while True:
         try:
@@ -111,7 +113,7 @@ def _build_body(
     return body
 
 
-def extract_records(result: Any) -> list[dict]:
+def extract_records(result: Any) -> list[dict[str, Any]]:
     if isinstance(result, dict):
         for key in ("records", "result", "data"):
             if isinstance(result.get(key), list):
@@ -134,7 +136,7 @@ def iter_records(
     until_iso: str | None,
     select: list[str],
     symbolic_period: str | None = None,
-) -> Iterator[dict]:
+) -> Iterator[dict[str, Any]]:
     emp_ids: list[int] = []
     if resource.employee_scope == EmployeeScope.HYPERFIND:
         emp_ids = resolve_employee_ids(client, hyperfind_ref)

@@ -76,7 +76,7 @@ class Component(ComponentBase):
 
     def _record_source(
         self, resource: ResourceDef, since_iso: str | None, until_iso: str | None
-    ) -> Iterator[dict]:
+    ) -> Iterator[dict[str, Any]]:
         if resource.incremental_style == IncrementalStyle.ASYNC_EXPORT:
             return run_async_export(
                 self.client, resource, since_iso or "", until_iso or "",
@@ -93,7 +93,7 @@ class Component(ComponentBase):
         )
 
     def _stream_and_write_table(
-        self, resource: ResourceDef, record_iter: Iterator[dict]
+        self, resource: ResourceDef, record_iter: Iterator[dict[str, Any]]
     ) -> tuple[int, list[str]]:
         """Stream rows to the output table with deterministic sorted columns.
 

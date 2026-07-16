@@ -28,7 +28,7 @@ def run_async_export(
     max_wait_s: int = 1800,
     poll_interval_s: int = 15,
     sleep: Callable[[float], None] = time.sleep,
-) -> Iterator[dict]:
+) -> Iterator[dict[str, Any]]:
     submit_body: dict[str, Any] = dict(resource.body_template)
     if resource.date_field:
         submit_body["dateRange"] = {"startDate": since_iso, "endDate": until_iso}

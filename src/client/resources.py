@@ -1,4 +1,5 @@
 from enum import StrEnum
+from typing import Any
 
 from keboola.component.exceptions import UserException
 from pydantic import BaseModel, Field
@@ -37,7 +38,7 @@ class ResourceDef(BaseModel):
     family: str
     method: HttpMethod
     endpoint_path: str
-    body_template: dict = Field(default_factory=dict)
+    body_template: dict[str, Any] = Field(default_factory=dict)
     select: list[str] = Field(default_factory=list)
     employee_scope: EmployeeScope = EmployeeScope.NONE
     batch_limit: int = 0
