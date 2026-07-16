@@ -5,6 +5,7 @@ from client.resources import (
     RESOURCE_REGISTRY,
     EmployeeScope,
     IncrementalStyle,
+    PaginationStyle,
     get_resource,
 )
 
@@ -28,6 +29,15 @@ def test_net_change_resource_has_50_batch_limit():
     r = get_resource("work_activity_net_changes")
     assert r.incremental_style == IncrementalStyle.NET_CHANGE
     assert r.batch_limit == 50
+
+
+def test_work_activity_shifts_is_hyperfind_date_window():
+    r = get_resource("work_activity_shifts")
+    assert r.family == "work"
+    assert r.employee_scope == EmployeeScope.HYPERFIND
+    assert r.incremental_style == IncrementalStyle.DATE_WINDOW
+    assert r.pagination == PaginationStyle.MULTI_READ
+    assert r.primary_key == []
 
 
 def test_persons_batch_limit_100():

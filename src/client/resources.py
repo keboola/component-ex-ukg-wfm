@@ -134,6 +134,9 @@ RESOURCE_REGISTRY: dict[str, ResourceDef] = {
         "attestations", "attestations", "/attestation/process_profiles/multi_read"
     ),
     "work_activities": _date_window("work_activities", "work", "/activities/multi_read"),
+    "work_activity_shifts": _date_window(
+        "work_activity_shifts", "work", "/activities/activity_shifts/multi_read"
+    ),
     # No stable PK -> runs as a case-2 full refresh (date window + REPLACE), NOT a true
     # net-change delta. See IncrementalStyle.NET_CHANGE for what enabling real delta needs.
     "work_activity_net_changes": ResourceDef(

@@ -48,7 +48,7 @@ Supported resources
 | Leave | `leave_cases`, `leave_edits`, `leave_requests` |
 | Attendance | `attendance_records`, `attendance_patterns`, `attendance_events` |
 | Attestations | `attestations` |
-| Work / Activities | `work_activities`, `work_activity_net_changes` |
+| Work / Activities | `work_activities`, `work_activity_shifts`, `work_activity_net_changes` |
 | Payroll | `payroll_export` (async submit → poll → download) |
 | Forecasting | `forecasting` |
 

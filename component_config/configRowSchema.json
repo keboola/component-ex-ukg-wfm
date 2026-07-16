@@ -30,6 +30,7 @@
         "attendance_events",
         "attestations",
         "work_activities",
+        "work_activity_shifts",
         "work_activity_net_changes",
         "payroll_export",
         "forecasting"
@@ -58,6 +59,7 @@
           "Attendance — Events",
           "Attestations",
           "Work / Activities",
+          "Work / Activities — Shifts",
           "Work / Activities — Net Changes (delta)",
           "Payroll Export (async)",
           "Forecasting (labor/volume)"
@@ -127,6 +129,7 @@
             "attendance_events",
             "attestations",
             "work_activities",
+            "work_activity_shifts",
             "work_activity_net_changes",
             "payroll_export"
           ]
@@ -164,6 +167,7 @@
             "attendance_events",
             "attestations",
             "work_activities",
+            "work_activity_shifts",
             "work_activity_net_changes",
             "payroll_export"
           ]
