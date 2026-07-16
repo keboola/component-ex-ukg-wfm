@@ -10,9 +10,19 @@ from client.resources import (
 )
 
 EXPECTED_FAMILIES = {
-    "people", "business_structure", "hyperfind", "information_access",
-    "timekeeping", "scheduling", "accruals", "leave", "attendance",
-    "attestations", "work", "payroll", "forecasting",
+    "people",
+    "business_structure",
+    "hyperfind",
+    "information_access",
+    "timekeeping",
+    "scheduling",
+    "accruals",
+    "leave",
+    "attendance",
+    "attestations",
+    "work",
+    "payroll",
+    "forecasting",
 }
 
 

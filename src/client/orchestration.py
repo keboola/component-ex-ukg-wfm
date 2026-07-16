@@ -13,18 +13,14 @@ _MAX_PAGES = 100_000
 
 def resolve_employee_ids(client: WfmClient, hyperfind_ref: str | None) -> list[int]:
     body: dict[str, Any] = (
-        {"hyperfind": {"id": hyperfind_ref}}
-        if hyperfind_ref
-        else {"hyperfind": {"qualifier": "All Home"}}
+        {"hyperfind": {"id": hyperfind_ref}} if hyperfind_ref else {"hyperfind": {"qualifier": "All Home"}}
     )
     result = client.post_json("/commons/hyperfind/execute", body)
     rows = result.get("result", []) if isinstance(result, dict) else []
     return [r["id"] for r in rows if "id" in r]
 
 
-def paginate_multi_read(
-    client: WfmClient, resource: ResourceDef, body: dict[str, Any]
-) -> Iterator[dict[str, Any]]:
+def paginate_multi_read(client: WfmClient, resource: ResourceDef, body: dict[str, Any]) -> Iterator[dict[str, Any]]:
     if resource.pagination != PaginationStyle.MULTI_READ:
         if resource.method == HttpMethod.GET:
             result = client.get_json(resource.endpoint_path)
@@ -64,14 +60,17 @@ def chunk_and_read(
     chunk_size = resource.batch_limit or len(emp_ids) or 1
     chunks = _initial_chunks(emp_ids, chunk_size) if emp_ids else [[]]
     for chunk in chunks:
-        yield from _read_chunk_with_shrink(
-            client, resource, chunk, since_iso, until_iso, select, symbolic_period
-        )
+        yield from _read_chunk_with_shrink(client, resource, chunk, since_iso, until_iso, select, symbolic_period)
 
 
 def _read_chunk_with_shrink(
-    client: WfmClient, resource: ResourceDef, chunk: list[int],
-    since_iso: str, until_iso: str, select: list[str], symbolic_period: str | None = None,
+    client: WfmClient,
+    resource: ResourceDef,
+    chunk: list[int],
+    since_iso: str,
+    until_iso: str,
+    select: list[str],
+    symbolic_period: str | None = None,
 ) -> Iterator[dict[str, Any]]:
     size = len(chunk) or 1
     while True:
@@ -86,9 +85,7 @@ def _read_chunk_with_shrink(
             logging.warning("413 on %s; shrinking chunk to %s employees.", resource.name, size)
             # Re-run the sub-chunks at the smaller size.
             for sub in _initial_chunks(chunk, size):
-                yield from _read_chunk_with_shrink(
-                    client, resource, sub, since_iso, until_iso, select, symbolic_period
-                )
+                yield from _read_chunk_with_shrink(client, resource, sub, since_iso, until_iso, select, symbolic_period)
             return
 
 
@@ -97,7 +94,11 @@ def _initial_chunks(items: list[int], size: int) -> list[list[int]]:
 
 
 def _build_body(
-    resource: ResourceDef, chunk: list[int], since_iso: str, until_iso: str, select: list[str],
+    resource: ResourceDef,
+    chunk: list[int],
+    since_iso: str,
+    until_iso: str,
+    select: list[str],
     symbolic_period: str | None = None,
 ) -> dict[str, Any]:
     body: dict[str, Any] = dict(resource.body_template)
@@ -140,6 +141,12 @@ def iter_records(
     emp_ids: list[int] = []
     if resource.employee_scope == EmployeeScope.HYPERFIND:
         emp_ids = resolve_employee_ids(client, hyperfind_ref)
+        # An empty Hyperfind result means "no matching employees". Without this guard the
+        # request would ship with no where.employees.ids, which WFM treats as ALL employees
+        # — a huge, wrongly-scoped read. Org-level resources (employee_scope != HYPERFIND)
+        # legitimately omit the employee filter, so this short-circuit is HYPERFIND-only.
+        if not emp_ids:
+            return
 
     # A symbolic period (e.g. "Current Pay Period") replaces the date window entirely; the
     # caller has already skipped window/watermark logic, so read once with the symbolic bound.
@@ -156,8 +163,6 @@ def iter_records(
         start = datetime.fromisoformat(since_iso)
         end = datetime.fromisoformat(until_iso)
         for w_start, w_end in split_date_windows(start, end):
-            yield from chunk_and_read(
-                client, resource, emp_ids, w_start.isoformat(), w_end.isoformat(), select
-            )
+            yield from chunk_and_read(client, resource, emp_ids, w_start.isoformat(), w_end.isoformat(), select)
     else:
         yield from chunk_and_read(client, resource, emp_ids, since_iso or "", until_iso or "", select)

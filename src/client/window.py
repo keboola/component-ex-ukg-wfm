@@ -21,9 +21,14 @@ def parse_since(value: str) -> datetime:
     Raises UserException if neither parser yields a result.
     """
     try:
-        return datetime.fromisoformat(value)
+        parsed = datetime.fromisoformat(value)
     except ValueError:
-        pass
+        parsed = None
+    if parsed is not None:
+        # fromisoformat returns a naive datetime for offset-less input (e.g. "2026-01-01T00:00:00");
+        # assume UTC so it stays comparable with the timezone-aware run-start (else a naive/aware
+        # comparison raises TypeError downstream in split_date_windows).
+        return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
 
     parsed = dateparser.parse(value, settings=_DATEPARSER_SETTINGS)
     if parsed is None:
@@ -49,9 +54,7 @@ def compute_window(
             try:
                 lower = datetime.fromisoformat(watermark)
             except ValueError as e:
-                raise UserException(
-                    f"Invalid ISO 8601 datetime value '{watermark}': {e}"
-                ) from e
+                raise UserException(f"Invalid ISO 8601 datetime value '{watermark}': {e}") from e
         else:
             # User-supplied since: supports both ISO and relative phrases.
             lower = parse_since(since)  # type: ignore[arg-type]
@@ -82,9 +85,7 @@ def resolve_window(
     return params.get(f"{date_field}_since"), params.get(f"{date_field}_until"), run_started
 
 
-def split_date_windows(
-    start: datetime, end: datetime, max_days: int = 365
-) -> list[tuple[datetime, datetime]]:
+def split_date_windows(start: datetime, end: datetime, max_days: int = 365) -> list[tuple[datetime, datetime]]:
     """Split [start, end) into contiguous sub-windows each spanning at most max_days."""
     if end <= start:
         return []

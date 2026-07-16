@@ -18,7 +18,12 @@ from client.window import STATE_LAST_RUN, resolve_window
 from configuration import Configuration
 
 _TIMESTAMP_FIELDS = {
-    "createdDateTime", "updatedDateTime", "startDateTime", "endDateTime", "start", "end",
+    "createdDateTime",
+    "updatedDateTime",
+    "startDateTime",
+    "endDateTime",
+    "start",
+    "end",
 }
 
 
@@ -48,17 +53,13 @@ class Component(ComponentBase):
             # Advance watermark even on empty result to prevent unbounded window growth.
             self.write_state_file({STATE_LAST_RUN: run_started})
         if row_count:
-            logging.info(
-                "Extracted resource '%s': %s rows, %s columns.", resource.name, row_count, len(columns)
-            )
+            logging.info("Extracted resource '%s': %s rows, %s columns.", resource.name, row_count, len(columns))
 
     def _effective_incremental(self, resource: ResourceDef) -> bool:
         """The one predicate governing watermark, fetch window, and manifest flag (see resources)."""
         return effective_incremental(resource, self._config.incremental)
 
-    def _compute_window(
-        self, resource: ResourceDef, state: dict[str, Any]
-    ) -> tuple[str | None, str | None, str]:
+    def _compute_window(self, resource: ResourceDef, state: dict[str, Any]) -> tuple[str | None, str | None, str]:
         """Return (since_iso, until_iso, run_started_iso)."""
         # A symbolic period replaces the date window; skip window and watermark logic.
         if self._config.symbolic_period:
@@ -79,15 +80,20 @@ class Component(ComponentBase):
     ) -> Iterator[dict[str, Any]]:
         if resource.incremental_style == IncrementalStyle.ASYNC_EXPORT:
             return run_async_export(
-                self.client, resource, since_iso or "", until_iso or "",
+                self.client,
+                resource,
+                since_iso or "",
+                until_iso or "",
                 self._config.hyperfind_ref,
                 max_wait_s=self._config.max_wait_seconds,
                 poll_interval_s=self._config.poll_interval_seconds,
             )
         return iter_records(
-            self.client, resource,
+            self.client,
+            resource,
             hyperfind_ref=self._config.hyperfind_ref,
-            since_iso=since_iso, until_iso=until_iso,
+            since_iso=since_iso,
+            until_iso=until_iso,
             select=self._config.select,
             symbolic_period=self._config.symbolic_period,
         )
@@ -142,11 +148,7 @@ class Component(ComponentBase):
             schema = {
                 col: ColumnDefinition(
                     data_types=BaseType(
-                        dtype=(
-                            SupportedDataTypes.TIMESTAMP
-                            if col in _TIMESTAMP_FIELDS
-                            else SupportedDataTypes.STRING
-                        )
+                        dtype=(SupportedDataTypes.TIMESTAMP if col in _TIMESTAMP_FIELDS else SupportedDataTypes.STRING)
                     ),
                     nullable=True,
                     primary_key=col in resource.primary_key,

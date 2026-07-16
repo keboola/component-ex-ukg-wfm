@@ -1,6 +1,18 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
-from client.window import STATE_LAST_RUN, compute_window, split_date_windows
+from client.window import STATE_LAST_RUN, compute_window, parse_since, split_date_windows
+
+
+def test_parse_since_naive_iso_is_normalized_to_utc():
+    # Offset-less ISO input must come back tz-aware UTC, else it can't be compared with the
+    # tz-aware run-start and split_date_windows raises TypeError.
+    result = parse_since("2026-01-01T00:00:00")
+    assert result.tzinfo is not None
+    assert result.utcoffset() == timedelta(0)
+
+
+def test_parse_since_keeps_explicit_offset():
+    assert parse_since("2026-01-01T00:00:00+00:00").utcoffset() == timedelta(0)
 
 
 def test_split_under_max_returns_single_window():

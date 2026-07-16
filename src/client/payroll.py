@@ -80,7 +80,5 @@ def _download_and_parse(client: WfmClient, download_url: str, job_id: str) -> It
             tmp.seek(0)
             payload = json.load(tmp)
     except (requests.RequestException, ValueError) as e:
-        raise UserException(
-            f"Payroll export {job_id} download/parse failed: {type(e).__name__}"
-        ) from e
+        raise UserException(f"Payroll export {job_id} download/parse failed: {type(e).__name__}") from e
     yield from extract_records(payload)

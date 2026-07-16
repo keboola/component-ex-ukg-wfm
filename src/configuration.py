@@ -36,10 +36,7 @@ class Configuration(BaseModel):
         try:
             super().__init__(**data)
         except ValidationError as e:
-            messages = [
-                f"{err['loc'][0] if err['loc'] else 'unknown'}: {err['msg']}"
-                for err in e.errors()
-            ]
+            messages = [f"{err['loc'][0] if err['loc'] else 'unknown'}: {err['msg']}" for err in e.errors()]
             raise UserException(f"Validation Error: {', '.join(messages)}") from e
 
     @computed_field

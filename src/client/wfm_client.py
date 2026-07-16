@@ -83,9 +83,15 @@ class WfmClient:
         expires_in = body.get("expires_in")
         if not access_token or expires_in is None:
             raise UserException("UKG WFM token response missing 'access_token'/'expires_in'.")
+        try:
+            ttl_s = int(expires_in)
+        except (TypeError, ValueError) as e:
+            raise UserException(f"UKG WFM token 'expires_in' is not numeric: {expires_in!r}") from e
         self._token = access_token
         self._refresh_token = body.get("refresh_token") or self._refresh_token
-        self._token_expiry = now + timedelta(seconds=int(expires_in) - _TOKEN_SAFETY_MARGIN_S)
+        # Clamp at 0 so a short-lived token (ttl < safety margin) doesn't land the expiry in the
+        # past and force a re-auth on every single request (tight refresh loop).
+        self._token_expiry = now + timedelta(seconds=max(ttl_s - _TOKEN_SAFETY_MARGIN_S, 0))
         logging.info("Obtained UKG WFM OAuth token (expires in %ss).", expires_in)
         return self._token
 
@@ -101,7 +107,10 @@ class WfmClient:
         return self._call("GET", f"{self._api_base}{path}", params=params)
 
     def _call(
-        self, method: str, url: str, json_body: dict[str, Any] | None = None,
+        self,
+        method: str,
+        url: str,
+        json_body: dict[str, Any] | None = None,
         params: dict[str, Any] | None = None,
     ) -> Any:
         # Retry exhaustion re-raises the final HTTPError, and transient ConnectionError/Timeout

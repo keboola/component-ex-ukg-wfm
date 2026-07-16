@@ -46,14 +46,20 @@ def test_post_json_raises_payload_too_large_on_413():
 
 def test_post_json_401_triggers_single_refresh_then_success():
     with requests_mock.Mocker() as m:
-        m.post(AUTH_URL, [
-            {"json": {"access_token": "T1", "refresh_token": "R1", "expires_in": 3600}},
-            {"json": {"access_token": "T2", "refresh_token": "R2", "expires_in": 3600}},
-        ])
-        m.post(f"{HOST}/api/v1/x", [
-            {"status_code": 401, "json": {}},
-            {"status_code": 200, "json": {"ok": True}},
-        ])
+        m.post(
+            AUTH_URL,
+            [
+                {"json": {"access_token": "T1", "refresh_token": "R1", "expires_in": 3600}},
+                {"json": {"access_token": "T2", "refresh_token": "R2", "expires_in": 3600}},
+            ],
+        )
+        m.post(
+            f"{HOST}/api/v1/x",
+            [
+                {"status_code": 401, "json": {}},
+                {"status_code": 200, "json": {"ok": True}},
+            ],
+        )
         c = _client()
         assert c.post_json("/x", {}) == {"ok": True}
 
@@ -79,3 +85,24 @@ def test_connection_error_surfaces_as_user_exception(monkeypatch):
         c = _client()
         with pytest.raises(UserException):
             c.post_json("/x", {})
+
+
+def test_non_numeric_expires_in_raises_user_exception():
+    # A malformed 'expires_in' must be a clean UserException (exit 1), not an int() ValueError (exit 2).
+    with requests_mock.Mocker() as m:
+        m.post(AUTH_URL, json={"access_token": "T1", "expires_in": "not-a-number"})
+        with pytest.raises(UserException):
+            _client().get_token()
+
+
+def test_short_ttl_does_not_apply_negative_safety_margin():
+    # ttl below the safety margin must clamp at 0, not push the expiry into the past
+    # (which would force a re-auth on every request — a tight refresh loop).
+    from datetime import UTC, datetime, timedelta
+
+    with requests_mock.Mocker() as m:
+        m.post(AUTH_URL, json={"access_token": "T1", "expires_in": 10})
+        c = _client()
+        t0 = datetime.now(UTC)
+        c.get_token()
+        assert c._token_expiry >= t0 - timedelta(seconds=1)
