@@ -17,6 +17,9 @@ class PayloadTooLargeError(Exception):
 
 
 def _is_retriable(e: Exception) -> bool:
+    # Transient network faults are always worth retrying.
+    if isinstance(e, requests.ConnectionError | requests.Timeout):
+        return True
     if isinstance(e, requests.HTTPError) and e.response is not None:
         code = e.response.status_code
         return code in _RETRIABLE_STATUS or code >= 500
@@ -97,12 +100,21 @@ class WfmClient:
     def get_json(self, path: str, params: dict | None = None) -> Any:
         return self._call("GET", f"{self._api_base}{path}", params=params)
 
-    def _call(self, method: str, url: str, json_body: dict | None = None, params: dict | None = None) -> Any:
-        resp = self._request_with_retry(method, url, json_body, params)
-        if resp.status_code == 401:
-            self._token = None
-            self._token_expiry = None
+    def _call(
+        self, method: str, url: str, json_body: dict[str, Any] | None = None,
+        params: dict[str, Any] | None = None,
+    ) -> Any:
+        # Retry exhaustion re-raises the final HTTPError, and transient ConnectionError/Timeout
+        # propagate once the retriable set gives up — convert both to UserException (exit 1),
+        # mirroring get_token(), so neither escapes as a bare exception (exit 2).
+        try:
             resp = self._request_with_retry(method, url, json_body, params)
+            if resp.status_code == 401:
+                self._token = None
+                self._token_expiry = None
+                resp = self._request_with_retry(method, url, json_body, params)
+        except requests.RequestException as e:
+            raise UserException(f"UKG WFM request to {url} failed: {type(e).__name__}") from e
         if resp.status_code == 413:
             raise PayloadTooLargeError(url)
         try:
@@ -118,14 +130,14 @@ class WfmClient:
 
     @backoff.on_exception(
         backoff.expo,
-        requests.HTTPError,
+        requests.RequestException,
         max_tries=5,
         factor=_BACKOFF_MIN_WAIT_S,
         giveup=lambda e: not _is_retriable(e),
         on_backoff=lambda details: _honor_retry_after(details),
     )
     def _request_with_retry(
-        self, method: str, url: str, json_body: dict | None, params: dict | None
+        self, method: str, url: str, json_body: dict[str, Any] | None, params: dict[str, Any] | None
     ) -> requests.Response:
         resp = requests.request(
             method,
