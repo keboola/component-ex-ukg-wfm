@@ -81,7 +81,8 @@ Testing
 - Unit tests: token/refresh, chunking + 413 shrink, ≤365-day window splitting, cacheKey
   pagination, payroll poll ceiling.
 - datadir mock tests (`tests/mock/`): one synthetic fixture per family plus an auth-failure case.
-- VCR functional replay (`tests/vcr/`): **synthetic** hand-authored cassettes (no sandbox).
+- VCR functional tests are **deferred** — cassettes must be *recorded* from a real tenant, which
+  requires credentials that do not exist yet (see blockers below). They are not hand-authored.
 
 Run the suite and lint:
 
@@ -93,10 +94,11 @@ uv run ruff check src/ tests/
 Known limitations / blockers
 ============================
 
-- **No public UKG WFM sandbox.** Live auth check, real VCR recordings, and the cf-dev smoke test
-  are blocked until a customer sandbox tenant with a provisioned service account and minted
-  `client_id`/`client_secret` is available. Once supplied, run `testConnection` and a
-  `timekeeping_punches` job to verify. All current fixtures are synthetic.
+- **No public UKG WFM sandbox.** The live auth check, VCR recording (real cassettes), and the
+  cf-dev smoke test are all blocked until a customer sandbox tenant with a provisioned service
+  account and minted `client_id`/`client_secret` is available. Once supplied, record VCR cassettes
+  with `component-developer:generate-vcr-tests` (record mode), then run `testConnection` and a
+  `timekeeping_punches` job to verify. Local coverage today is unit + datadir mock tests only.
 - Endpoint paths and primary keys reflect best-known documented WFM shapes; because the engine is
   data-driven, correcting any path/PK is a one-line registry edit in `src/client/resources.py`.
 
