@@ -53,7 +53,7 @@ def run_async_export(
             raise UserException(
                 f"Payroll export job {job_id} exceeded max wait of {max_wait_s}s (last status {status})."
             )
-        logging.info("Payroll export %s status=%s; waiting %ss.", job_id, status, poll_interval_s)
+        logging.debug("Payroll export %s status=%s; waiting %ss.", job_id, status, poll_interval_s)
         sleep(poll_interval_s)
         waited += poll_interval_s
 
