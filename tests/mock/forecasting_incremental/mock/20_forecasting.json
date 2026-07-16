@@ -1,5 +1,5 @@
 {
-  "url": "https://acme.prd.mykronos.com/api/v1/forecasting/volume/multi_read",
+  "url": "https://acme.prd.mykronos.com/api/v1/forecasting/volume_forecasts/multi_read",
   "method": "POST",
   "json": {"records": [
     {"id": 1, "metric": "TransactionVolume", "value": "120"},

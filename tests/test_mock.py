@@ -89,26 +89,19 @@ class MockedTestDataDir(TestDataDir):
             url = spec["url"]
 
             if "responses" in spec:
-                mocker.register_uri(
-                    method,
-                    url,
-                    [
-                        {
-                            "json": r.get("json"),
-                            "status_code": r.get("status_code", 200),
-                            "headers": r.get("headers", {}),
-                        }
-                        for r in spec["responses"]
-                    ],
-                )
+                mocker.register_uri(method, url, [self._response_kwargs(r) for r in spec["responses"]])
             else:
-                mocker.register_uri(
-                    method,
-                    url,
-                    json=spec.get("json"),
-                    status_code=spec.get("status_code", 200),
-                    headers=spec.get("headers", {}),
-                )
+                mocker.register_uri(method, url, **self._response_kwargs(spec))
+
+    @staticmethod
+    def _response_kwargs(spec: dict) -> dict:
+        """Build requests_mock response kwargs. A "text" body (e.g. CSV) takes precedence over json."""
+        kwargs: dict = {"status_code": spec.get("status_code", 200), "headers": spec.get("headers", {})}
+        if "text" in spec:
+            kwargs["text"] = spec["text"]
+        else:
+            kwargs["json"] = spec.get("json")
+        return kwargs
 
 
 def test_mock():

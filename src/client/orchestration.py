@@ -5,7 +5,7 @@ from typing import Any
 
 from keboola.component.exceptions import UserException
 
-from client.resources import BodyStyle, EmployeeScope, HttpMethod, IncrementalStyle, ResourceDef
+from client.resources import BodyStyle, EmployeeScope, HttpMethod, IncrementalStyle, PaginationStyle, ResourceDef
 from client.wfm_client import PayloadTooLargeError, WfmClient
 from client.window import split_date_windows
 
@@ -14,6 +14,12 @@ def _as_date(iso: str | None) -> str | None:
     """WFM read endpoints want a plain calendar date (YYYY-MM-DD); a full ISO datetime is
     rejected with WFP-90100 / TKException 'Invalid Parameter Date String'. Truncate to 10 chars."""
     return iso[:10] if iso else None
+
+
+def _as_datetime(iso: str | None) -> str | None:
+    """WFM apply_read/net-change endpoints want a tz-naive datetime (YYYY-MM-DDTHH:MM:SS).
+    Strip any timezone suffix / microseconds by keeping the first 19 chars."""
+    return iso[:19] if iso else None
 
 
 def resolve_employee_ids(
@@ -43,19 +49,43 @@ def resolve_employee_ids(
     return [r["id"] for r in rows if isinstance(r, dict) and "id" in r]
 
 
-def paginate_multi_read(client: WfmClient, resource: ResourceDef, body: dict[str, Any]) -> Iterator[dict[str, Any]]:
-    """Issue one read for the given (already employee-batched) body and yield its records.
+_APPLY_READ_MAX_PAGES = 100_000  # safety cap so a misbehaving endpoint can't loop forever
 
-    UKG's employee-scoped read endpoints return the full result set for the employee batch in a
-    single response — they do NOT accept the commons cacheKey/count/index paging params (those
-    return WFP-90011 "Unrecognized property count"). Volume is bounded instead by employee
-    batching in chunk_and_read, so this is a single request per chunk.
+
+def paginate_multi_read(client: WfmClient, resource: ResourceDef, body: dict[str, Any]) -> Iterator[dict[str, Any]]:
+    """Issue the read(s) for the given (already employee-batched) body and yield its records.
+
+    multi_read endpoints return the full result set for the employee batch in a single response —
+    they do NOT accept the commons cacheKey/count/index paging params (those return WFP-90011).
+    Volume is bounded instead by employee batching in chunk_and_read, so that is one request per
+    chunk. apply_read endpoints (persons, punches) page via count+index in the request body.
     """
+    if resource.pagination == PaginationStyle.APPLY_READ:
+        yield from _paginate_apply_read(client, resource, body)
+        return
     if resource.method == HttpMethod.GET:
         result = client.get_json(resource.endpoint_path)
     else:
         result = client.post_json(resource.endpoint_path, body)
     yield from extract_records(result, resource.records_key)
+
+
+def _paginate_apply_read(
+    client: WfmClient, resource: ResourceDef, body: dict[str, Any]
+) -> Iterator[dict[str, Any]]:
+    """Page an apply_read endpoint via count+index in the request body.
+
+    Loop incrementing the 0-based page `index`, injecting `count` (page size), until a page returns
+    fewer than `count` records. `body` already carries the where clause from _build_body.
+    """
+    count = resource.page_count or 100
+    for index in range(_APPLY_READ_MAX_PAGES):
+        page_body = {**body, "index": index, "count": count}
+        result = client.post_json(resource.endpoint_path, page_body)
+        records = extract_records(result, resource.records_key)
+        yield from records
+        if len(records) < count:
+            return
 
 
 def chunk_and_read(
@@ -128,6 +158,61 @@ def _build_body(
     style = resource.body_style
     date_range = _date_range(since_iso, until_iso)
     sel = select or resource.select
+
+    if style == BodyStyle.STATIC:
+        # Body emitted verbatim (org-level fixed criteria, e.g. generic_locations).
+        return dict(resource.body_template)
+
+    if style == BodyStyle.APPLY_READ_PERSONS:
+        # Org-wide bulk read; count/index are injected by the apply_read paginator.
+        return dict(resource.body_template)
+
+    if style == BodyStyle.APPLY_READ_PUNCHES:
+        # where.employees.ids + where.dateRange with DATETIME keys; count/index added by paginator.
+        where: dict[str, Any] = {}
+        if chunk:
+            where["employees"] = {"ids": chunk}
+        start_dt, end_dt = _as_datetime(since_iso), _as_datetime(until_iso)
+        if start_dt and end_dt:
+            where["dateRange"] = {"startDateTime": start_dt, "endDateTime": end_dt}
+        return {"where": where}
+
+    if style == BodyStyle.EMPLOYEE_SET_METRICS:
+        body = dict(resource.body_template)
+        employee_set: dict[str, Any] = {}
+        if chunk:
+            employee_set["employees"] = {"ids": chunk}
+        if symbolic_period:
+            employee_set["symbolicPeriod"] = {"qualifier": symbolic_period}
+        elif date_range:
+            employee_set["dateRange"] = date_range
+        body["where"] = {"employeeSet": employee_set}
+        return body
+
+    if style == BodyStyle.WHERE_EMPLOYEES_LIST:
+        body = dict(resource.body_template)
+        where = {}
+        if chunk:
+            where["employees"] = [{"id": emp_id} for emp_id in chunk]
+        if symbolic_period:
+            where["symbolicPeriod"] = {"qualifier": symbolic_period}
+        elif date_range:
+            where["dateRange"] = date_range
+        body["where"] = where
+        return body
+
+    if style == BodyStyle.NET_CHANGE_SEGMENTS:
+        # where.employees.ids + lastRunDateTime/endDateTime (DATETIME); select from body_template.
+        body = dict(resource.body_template)
+        where = {}
+        if chunk:
+            where["employees"] = {"ids": chunk}
+        start_dt, end_dt = _as_datetime(since_iso), _as_datetime(until_iso)
+        if start_dt and end_dt:
+            where["lastRunDateTime"] = start_dt
+            where["endDateTime"] = end_dt
+        body["where"] = where
+        return body
 
     if style == BodyStyle.INFO_ACCESS:
         ref = int(hyperfind_ref) if hyperfind_ref and str(hyperfind_ref).lstrip("-").isdigit() else hyperfind_ref
@@ -242,7 +327,8 @@ def iter_records(
     if resource.incremental_style in _WINDOWED_STYLES and since_iso and until_iso:
         start = datetime.fromisoformat(since_iso)
         end = datetime.fromisoformat(until_iso)
-        for w_start, w_end in split_date_windows(start, end):
+        # Sub-hour granularity for endpoints with a per-call window cap (punches <= 60 min).
+        for w_start, w_end in split_date_windows(start, end, max_minutes=resource.window_max_minutes):
             yield from chunk_and_read(
                 client, resource, emp_ids, w_start.isoformat(), w_end.isoformat(), select, None, hyperfind_ref
             )

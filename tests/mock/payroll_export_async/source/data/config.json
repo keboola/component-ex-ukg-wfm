@@ -7,9 +7,8 @@
     "#password": "pw",
     "resource": "payroll_export",
     "load_type": "incremental_load",
-    "since": "30 days ago",
-    "hyperfind_ref": "AllHome",
     "poll_interval_seconds": 1,
-    "max_wait_seconds": 600
+    "max_wait_seconds": 600,
+    "payroll_query": "SELECT personnumber, grosswages FROM payrolldetail"
   }
 }

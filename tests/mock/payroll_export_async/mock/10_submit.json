@@ -1,5 +1,12 @@
 {
-  "url": "https://acme.prd.mykronos.com/api/v1/payroll/export",
+  "url": "https://acme.prd.mykronos.com/api/v1/commons/payroll/export/async",
   "method": "POST",
-  "json": {"id": "J1"}
+  "status_code": 202,
+  "json": {
+    "executionKey": "EK1",
+    "state": "IN_PROGRESS",
+    "message": "queued",
+    "nextPing": 1,
+    "expiresAt": "2026-07-17T00:00:00"
+  }
 }

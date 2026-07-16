@@ -85,11 +85,17 @@ def resolve_window(
     return params.get(f"{date_field}_since"), params.get(f"{date_field}_until"), run_started
 
 
-def split_date_windows(start: datetime, end: datetime, max_days: int = 365) -> list[tuple[datetime, datetime]]:
-    """Split [start, end) into contiguous sub-windows each spanning at most max_days."""
+def split_date_windows(
+    start: datetime, end: datetime, max_days: int = 365, max_minutes: int = 0
+) -> list[tuple[datetime, datetime]]:
+    """Split [start, end) into contiguous sub-windows each spanning at most the given bound.
+
+    max_minutes > 0 takes precedence (minute-granular windows, e.g. the <= 60-minute punches cap);
+    otherwise the window is split by max_days.
+    """
     if end <= start:
         return []
-    span = timedelta(days=max_days)
+    span = timedelta(minutes=max_minutes) if max_minutes > 0 else timedelta(days=max_days)
     windows: list[tuple[datetime, datetime]] = []
     cursor = start
     while cursor < end:

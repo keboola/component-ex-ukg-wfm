@@ -1,8 +1,18 @@
 {
-  "url": "https://acme.prd.mykronos.com/api/v1/attestation/process_profiles/multi_read",
+  "url": "https://acme.prd.mykronos.com/api/v1/timekeeping/attestation/multi_read",
   "method": "POST",
-  "json": {"records": [
-    {"id": 1, "profileName": "Daily Attestation", "status": "Active"},
-    {"id": 2, "profileName": "Weekly Attestation", "status": "Inactive"}
-  ]}
+  "json": {
+    "records": [
+      {
+        "id": 1,
+        "profileName": "Daily Attestation",
+        "status": "Active"
+      },
+      {
+        "id": 2,
+        "profileName": "Weekly Attestation",
+        "status": "Inactive"
+      }
+    ]
+  }
 }

@@ -1,8 +1,18 @@
 {
-  "url": "https://acme.prd.mykronos.com/api/v1/commons/business_structure/multi_read",
+  "url": "https://acme.prd.mykronos.com/api/v1/commons/generic_locations/multi_read",
   "method": "POST",
-  "json": {"records": [
-    {"id": 1, "name": "Acme Retail", "level": "Company"},
-    {"id": 2, "name": "Downtown Store", "level": "Location"}
-  ]}
+  "json": {
+    "records": [
+      {
+        "id": 1,
+        "name": "Acme Retail",
+        "level": "Company"
+      },
+      {
+        "id": 2,
+        "name": "Downtown Store",
+        "level": "Location"
+      }
+    ]
+  }
 }

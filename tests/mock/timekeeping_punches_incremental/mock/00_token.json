@@ -1,5 +1,0 @@
-{
-  "url": "https://acme.prd.mykronos.com/api/authentication/access_token",
-  "method": "POST",
-  "json": {"access_token": "T", "refresh_token": "R", "expires_in": 3600}
-}

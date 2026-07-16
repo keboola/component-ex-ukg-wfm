@@ -3,6 +3,7 @@ from keboola.component.exceptions import UserException
 
 from client.resources import (
     RESOURCE_REGISTRY,
+    BodyStyle,
     EmployeeScope,
     IncrementalStyle,
     PaginationStyle,
@@ -50,8 +51,25 @@ def test_work_activity_shifts_is_hyperfind_date_window():
     assert r.primary_key == []
 
 
-def test_persons_batch_limit_100():
-    assert get_resource("persons").batch_limit == 100
+def test_persons_is_org_wide_apply_read():
+    r = get_resource("persons")
+    assert r.endpoint_path == "/commons/persons/apply_read"
+    assert r.body_style == BodyStyle.APPLY_READ_PERSONS
+    assert r.pagination == PaginationStyle.APPLY_READ
+    assert r.employee_scope == EmployeeScope.NONE
+    assert r.page_count == 1000
+    assert r.records_key == "records"
+    assert r.primary_key == ["personNumber"]
+
+
+def test_punches_is_apply_read_with_minute_window():
+    r = get_resource("timekeeping_punches")
+    assert r.endpoint_path == "/timekeeping/punches/apply_read"
+    assert r.body_style == BodyStyle.APPLY_READ_PUNCHES
+    assert r.pagination == PaginationStyle.APPLY_READ
+    assert r.page_count == 25
+    assert r.window_max_minutes == 60
+    assert r.records_key == "data"
 
 
 def test_hyperfind_scope_resources_flagged():

@@ -98,6 +98,7 @@ class Component(ComponentBase):
                 since_iso or "",
                 until_iso or "",
                 self._config.hyperfind_ref,
+                query=self._config.payroll_query,
                 max_wait_s=self._config.max_wait_seconds,
                 poll_interval_s=self._config.poll_interval_seconds,
             )

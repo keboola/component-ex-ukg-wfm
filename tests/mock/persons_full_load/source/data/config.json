@@ -6,7 +6,6 @@
     "#username": "svc_user",
     "#password": "pw",
     "resource": "persons",
-    "load_type": "full_load",
-    "hyperfind_ref": "AllHome"
+    "load_type": "full_load"
   }
 }

@@ -31,6 +31,8 @@ class Configuration(BaseModel):
     date_field: str | None = None
     max_wait_seconds: int = Field(default=1800, ge=1)
     poll_interval_seconds: int = Field(default=15, ge=1)
+    # Tenant-defined SQL-like query for the async payroll export (payroll_export resource only).
+    payroll_query: str | None = None
 
     def __init__(self, **data: Any):
         try:
