@@ -14,10 +14,21 @@ def _client(m):
 
 
 def test_resolve_employee_ids_from_hyperfind():
+    # Real API shape: {"count", "result": {"refs": [{id,qualifier}], "basePersons": [...]}}.
+    captured: list[dict] = []
     with requests_mock.Mocker() as m:
         c = _client(m)
-        m.post(f"{HOST}/api/v1/commons/hyperfind/execute", json={"result": [{"id": 11}, {"id": 22}]})
-        assert resolve_employee_ids(c, "MyQuery") == [11, 22]
+
+        def _capture(request, context):
+            captured.append(request.json())
+            return {"count": 2, "result": {"refs": [{"id": 11}, {"id": 22}], "basePersons": []}}
+
+        m.post(f"{HOST}/api/v1/commons/hyperfind/execute", json=_capture)
+        assert resolve_employee_ids(c, "253", "2026-01-01T00:00:00+00:00", "2026-02-01T00:00:00+00:00") == [11, 22]
+    # A numeric ref is sent as hyperfind.id (int) and execute always carries a calendar dateRange.
+    body = captured[0]
+    assert body["hyperfind"] == {"id": 253}
+    assert body["dateRange"] == {"startDate": "2026-01-01", "endDate": "2026-02-01"}
 
 
 def test_hyperfind_empty_result_short_circuits_without_unscoped_read():
@@ -42,20 +53,30 @@ def test_hyperfind_empty_result_short_circuits_without_unscoped_read():
         assert read.call_count == 0  # no unscoped read issued
 
 
-def test_paginate_multi_read_follows_cachekey():
+def test_paginate_multi_read_single_request_no_cachekey():
+    # WFM employee-scoped reads return the whole batch in one response and reject cacheKey/count
+    # paging props; paginate_multi_read must issue exactly one request per (already-batched) body.
     res = get_resource("timekeeping_punches")
     with requests_mock.Mocker() as m:
         c = _client(m)
-        url = f"{HOST}/api/v1{res.endpoint_path}"
+        read = m.post(f"{HOST}/api/v1{res.endpoint_path}", json={"records": [{"id": 1}, {"id": 2}]})
+        rows = list(paginate_multi_read(c, res, {"where": {"employees": {"ids": [1]}}}))
+        assert [r["id"] for r in rows] == [1, 2]
+        assert read.call_count == 1
+
+
+def test_paginate_multi_read_honors_records_key_envelope():
+    # scheduling_shifts surfaces the "shifts" envelope from the composite schedule response.
+    res = get_resource("scheduling_shifts")
+    assert res.records_key == "shifts"
+    with requests_mock.Mocker() as m:
+        c = _client(m)
         m.post(
-            url,
-            [
-                {"json": {"records": [{"id": 1}, {"id": 2}], "cacheKey": "K", "count": 2}},
-                {"json": {"records": [{"id": 3}], "cacheKey": "K", "count": 2}},
-            ],
+            f"{HOST}/api/v1{res.endpoint_path}",
+            json={"shifts": [{"id": 9}], "scheduleDayList": [{"day": "x"}], "employees": [{"id": 1}]},
         )
-        rows = list(paginate_multi_read(c, res, {"select": [], "count": 2}))
-        assert [r["id"] for r in rows] == [1, 2, 3]
+        rows = list(paginate_multi_read(c, res, {}))
+        assert [r["id"] for r in rows] == [9]
 
 
 def test_chunk_and_read_shrinks_on_413():
@@ -81,7 +102,10 @@ def test_net_change_runs_as_date_window_without_token():
     captured: list[dict] = []
     with requests_mock.Mocker() as m:
         c = _client(m)
-        m.post(f"{HOST}/api/v1/commons/hyperfind/execute", json={"result": [{"id": 7}]})
+        m.post(
+            f"{HOST}/api/v1/commons/hyperfind/execute",
+            json={"count": 1, "result": {"refs": [{"id": 7}], "basePersons": []}},
+        )
 
         def _capture(request, context):
             captured.append(request.json())
@@ -102,21 +126,27 @@ def test_net_change_runs_as_date_window_without_token():
     assert captured, "net_change resource issued no multi_read call"
     body = captured[0]
     assert "netChangeToken" not in body
-    assert body["where"]["dateRange"]["startDate"] == "2026-01-01T00:00:00+00:00"
+    # dateRange is a plain calendar date (not a full ISO datetime, which WFM rejects).
+    assert body["where"]["dateRange"] == {"startDate": "2026-01-01", "endDate": "2026-02-01"}
 
 
 def test_symbolic_period_replaces_date_window():
     """I2: when a symbolic period is set, the request sends where.symbolicPeriod and
     omits the date window entirely (window/watermark logic is skipped upstream)."""
+    # scheduling_shifts uses BodyStyle.WHERE_EMPLOYEE_REFS, so scope + period live under
+    # where.employees; the "shifts" envelope is surfaced via records_key.
     res = get_resource("scheduling_shifts")
     captured: list[dict] = []
     with requests_mock.Mocker() as m:
         c = _client(m)
-        m.post(f"{HOST}/api/v1/commons/hyperfind/execute", json={"result": [{"id": 7}]})
+        m.post(
+            f"{HOST}/api/v1/commons/hyperfind/execute",
+            json={"count": 1, "result": {"refs": [{"id": 7}], "basePersons": []}},
+        )
 
         def _capture(request, context):
             captured.append(request.json())
-            return {"records": [{"id": 1}]}
+            return {"shifts": [{"id": 1}]}
 
         m.post(f"{HOST}/api/v1{res.endpoint_path}", json=_capture)
         rows = list(
@@ -131,6 +161,6 @@ def test_symbolic_period_replaces_date_window():
             )
         )
     assert [r["id"] for r in rows] == [1]
-    body = captured[0]
-    assert body["where"]["symbolicPeriod"] == {"qualifier": "Current Pay Period"}
-    assert "dateRange" not in body["where"]
+    employees = captured[0]["where"]["employees"]
+    assert employees["symbolicPeriod"] == {"qualifier": "Current Pay Period"}
+    assert "startDate" not in employees and "endDate" not in employees

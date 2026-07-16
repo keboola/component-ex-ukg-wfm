@@ -59,10 +59,12 @@ def run_async_export(
 
     if not download_url:
         download_url = f"{client.api_base}{resource.endpoint_path}/{job_id}/file"
-    yield from _download_and_parse(client, download_url, job_id)
+    yield from _download_and_parse(client, download_url, job_id, resource.records_key)
 
 
-def _download_and_parse(client: WfmClient, download_url: str, job_id: str) -> Iterator[dict[str, Any]]:
+def _download_and_parse(
+    client: WfmClient, download_url: str, job_id: str, records_key: str | None = None
+) -> Iterator[dict[str, Any]]:
     """Stream the export body to a /tmp scratch file, then parse and yield rows.
 
     The raw HTTP body is streamed to disk in chunks (never buffered whole in RAM); the
@@ -81,4 +83,4 @@ def _download_and_parse(client: WfmClient, download_url: str, job_id: str) -> It
             payload = json.load(tmp)
     except (requests.RequestException, ValueError) as e:
         raise UserException(f"Payroll export {job_id} download/parse failed: {type(e).__name__}") from e
-    yield from extract_records(payload)
+    yield from extract_records(payload, records_key)

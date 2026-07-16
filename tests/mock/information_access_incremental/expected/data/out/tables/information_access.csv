@@ -1,3 +1,2 @@
-accessGroup,id,role
-Managers,1,Supervisor
-Employees,2,Associate
+key,rootEntity,summaryListDisplay
+root,EMP,All Employees

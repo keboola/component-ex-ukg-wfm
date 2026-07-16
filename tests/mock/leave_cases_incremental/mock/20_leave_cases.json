@@ -1,8 +1,8 @@
 {
-  "url": "https://acme.prd.mykronos.com/api/v1/leave/cases/multi_read",
+  "url": "https://acme.prd.mykronos.com/api/v1/leave/leave_cases/multi_read",
   "method": "POST",
-  "json": {"records": [
+  "json": [
     {"id": 1, "leaveType": "Medical", "status": "Approved"},
     {"id": 2, "leaveType": "Parental", "status": "Pending"}
-  ]}
+  ]
 }

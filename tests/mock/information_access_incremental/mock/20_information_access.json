@@ -1,8 +1,8 @@
 {
   "url": "https://acme.prd.mykronos.com/api/v1/commons/data/multi_read",
   "method": "POST",
-  "json": {"records": [
-    {"id": 1, "accessGroup": "Managers", "role": "Supervisor"},
-    {"id": 2, "accessGroup": "Employees", "role": "Associate"}
-  ]}
+  "json": {
+    "metadata": {"cacheKey": "K1", "totalElements": 1, "numNodes": 1},
+    "data": {"key": "root", "rootEntity": "EMP", "summaryListDisplay": "All Employees"}
+  }
 }
