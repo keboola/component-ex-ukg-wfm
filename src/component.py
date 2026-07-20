@@ -19,18 +19,67 @@ from configuration import Configuration
 
 # Baseline recording sanitizer: DefaultSanitizer strips the Authorization header and the known
 # credential fields (client_id, client_secret, password, token, access_token, refresh_token) from
-# recorded cassettes; `username` is a WFM credential the default list misses. Host rewriting and any
-# employee-PII field redaction are added deliberately after reviewing the first recording.
-# keboola.vcr is a dev-only dependency (via keboola.datadirtest); the production image is built with
-# `uv sync --no-dev`, so guard the import — VCR_SANITIZERS is only consumed by the recording harness.
+# recorded cassettes; `username` is a WFM credential the default list misses. On top of that we
+# redact broadly — every identifying / free-text field WFM returns (names, labels, descriptions,
+# comments) — keeping only numeric ids, dates, numbers, booleans and enums, which are the
+# structural data that prove the extraction without exposing employee PII. Host rewriting maps the
+# real tenant host to a placeholder, and a CallbackSanitizer caps record volume so cassettes stay
+# small. keboola.vcr is a dev-only dependency (via keboola.datadirtest); the production image is
+# built with `uv sync --no-dev`, so guard the import — VCR_SANITIZERS is only consumed by the
+# recording harness.
 try:
-    from keboola.vcr import DefaultSanitizer, UrlPatternSanitizer
+    import json as _json
+
+    from keboola.vcr import CallbackSanitizer, DefaultSanitizer, UrlPatternSanitizer
+
+    _MAX_ARRAY_ITEMS = 25
+
+    def _truncate_json_arrays(value: Any) -> Any:
+        """Recursively cap every JSON array to at most _MAX_ARRAY_ITEMS elements."""
+        if isinstance(value, list):
+            return [_truncate_json_arrays(item) for item in value[:_MAX_ARRAY_ITEMS]]
+        if isinstance(value, dict):
+            return {key: _truncate_json_arrays(item) for key, item in value.items()}
+        return value
+
+    def _cap_response_records(response: dict) -> dict:
+        """CallbackSanitizer before_response hook: shrink recorded responses.
+
+        Receives the vcrpy response dict (body at response["body"]["string"] as
+        str or bytes), JSON-parses it, truncates every array, and re-serializes
+        to valid JSON so the replay parser still reads it. Non-JSON bodies pass
+        through untouched.
+        """
+        body = response.get("body")
+        if not isinstance(body, dict) or "string" not in body:
+            return response
+        raw = body["string"]
+        is_bytes = isinstance(raw, bytes)
+        text = raw.decode("utf-8", errors="ignore") if is_bytes else raw
+        if not text:
+            return response
+        try:
+            data = _json.loads(text)
+        except (_json.JSONDecodeError, TypeError, ValueError):
+            return response
+        capped = _json.dumps(_truncate_json_arrays(data))
+        body["string"] = capped.encode("utf-8") if is_bytes else capped
+        return response
+
     VCR_SANITIZERS = [
         DefaultSanitizer(additional_sensitive_fields=[
+            # Credential / person identity (already vetted).
             "username", "firstName", "lastName", "fullName", "displayName",
             "updateByPersonFullName", "personNumber",
+            # Identifying names and free-text fields across WFM resources.
+            "name", "qualifier", "shortName", "typeName", "description",
+            "functionalAreaName", "parentName", "holidayDisplayName",
+            "dataSourceDisplayName", "label", "trackingLabel",
+            "laborCategoryEntryDescription", "commentNotes", "commentsNotes",
+            "comments", "comment", "notes",
         ]),
         UrlPatternSanitizer(patterns=[(r"[a-z0-9-]+\.prd\.mykronos\.com", "acme.prd.mykronos.com")]),
+        CallbackSanitizer(before_response=_cap_response_records),
     ]
 except ImportError:
     VCR_SANITIZERS = []
