@@ -39,18 +39,26 @@ Supported resources
 | Family | Resources |
 |---|---|
 | People | `persons` |
-| Business Structure | `business_structure` |
+| Business Structure | `business_structure` (legacy `/commons/locations` org-map read) |
 | Hyperfind | `hyperfind_queries` |
-| Information Access | `information_access` |
 | Timekeeping | `timekeeping_punches`, `timekeeping_timecards`, `timekeeping_timecard_metrics` |
 | Scheduling | `scheduling_schedules`, `scheduling_shifts`, `scheduling_open_shifts`, `scheduling_swaps` |
-| Accruals | `accruals_balances`, `accruals_transactions`, `accruals_summaries` |
-| Leave | `leave_cases`, `leave_edits`, `leave_requests` |
-| Attendance | `attendance_records`, `attendance_patterns`, `attendance_events` |
+| Accruals | `accruals_balances`, `accruals_transactions`, `accruals_summaries` (all via `timecard_metrics` `select`) |
+| Leave | `leave_cases`, `leave_edits` |
+| Attendance | `attendance_records`, `attendance_events` |
 | Attestations | `attestations` |
 | Work / Activities | `work_activities`, `work_activity_shifts`, `work_activity_net_changes` |
 | Payroll | `payroll_export` (async submit → poll → download) |
 | Forecasting | `forecasting` |
+
+> The three **Accruals** resources share `POST /timekeeping/timecard_metrics/multi_read`, differing only
+> by the `select` value: `accruals_balances` and `accruals_summaries` use `ACCRUAL_SUMMARY` (which carries
+> balance data), `accruals_transactions` uses `ACCRUAL_TRANSACTIONS`. There is no bulk `/accruals/*` read.
+>
+> The **Work / Activities** resources require the Activities Integration API license, which is off on the
+> reference tenant (HTTP 403 `WFA-000030`); their request shapes are verified but a live 200 is gated on
+> licensing. **Forecasting** needs a non-empty tenant-configured `categoryDrivers` set; the reference
+> tenant has none configured, so it cannot yet return data (`WFF-270000`).
 
 Incremental & windowing
 =======================

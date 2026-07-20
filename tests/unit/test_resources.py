@@ -1,3 +1,6 @@
+import json
+from pathlib import Path
+
 import pytest
 from keboola.component.exceptions import UserException
 
@@ -10,11 +13,12 @@ from client.resources import (
     get_resource,
 )
 
+_ROW_SCHEMA = Path(__file__).parents[2] / "component_config" / "configRowSchema.json"
+
 EXPECTED_FAMILIES = {
     "people",
     "business_structure",
     "hyperfind",
-    "information_access",
     "timekeeping",
     "scheduling",
     "accruals",
@@ -25,6 +29,51 @@ EXPECTED_FAMILIES = {
     "payroll",
     "forecasting",
 }
+
+
+def test_row_schema_resource_enum_equals_registry_keys():
+    """Gate: the configRowSchema `resource` enum must EXACTLY match the registry keys (same set
+    and order), and enum_titles must stay index-aligned."""
+    schema = json.loads(_ROW_SCHEMA.read_text())
+    resource_prop = schema["properties"]["resource"]
+    enum = resource_prop["enum"]
+    titles = resource_prop["options"]["enum_titles"]
+    assert enum == list(RESOURCE_REGISTRY.keys())
+    assert len(titles) == len(enum)
+
+
+def test_dropped_resources_absent():
+    for dropped in ("information_access", "leave_requests", "attendance_patterns"):
+        assert dropped not in RESOURCE_REGISTRY
+
+
+def test_accruals_share_timecard_metrics_endpoint_via_select():
+    balances = get_resource("accruals_balances")
+    transactions = get_resource("accruals_transactions")
+    summaries = get_resource("accruals_summaries")
+    for r in (balances, transactions, summaries):
+        assert r.family == "accruals"
+        assert r.endpoint_path == "/timekeeping/timecard_metrics/multi_read"
+        assert r.body_style == BodyStyle.EMPLOYEE_SET_METRICS
+        assert r.primary_key == ["employeeId_id"]
+    assert balances.select == ["ACCRUAL_SUMMARY"]
+    assert summaries.select == ["ACCRUAL_SUMMARY"]
+    assert transactions.select == ["ACCRUAL_TRANSACTIONS"]
+
+
+def test_business_structure_uses_legacy_locations():
+    r = get_resource("business_structure")
+    assert r.endpoint_path == "/commons/locations/multi_read"
+    assert r.body_style == BodyStyle.LOCATIONS_QUERY
+    assert r.primary_key == ["nodeId"]
+
+
+def test_scheduling_swaps_shape():
+    r = get_resource("scheduling_swaps")
+    assert r.endpoint_path == "/scheduling/employee_swap/multi_read"
+    assert r.body_style == BodyStyle.SWAP_EMPLOYEES
+    assert r.employee_scope == EmployeeScope.HYPERFIND
+    assert r.incremental_style == IncrementalStyle.DATE_WINDOW
 
 
 def test_every_capability_family_present():

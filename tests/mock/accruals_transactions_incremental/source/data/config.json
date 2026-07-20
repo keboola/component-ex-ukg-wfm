@@ -5,7 +5,7 @@
     "#client_secret": "csec",
     "#username": "svc_user",
     "#password": "pw",
-    "resource": "information_access",
+    "resource": "accruals_transactions",
     "load_type": "incremental_load",
     "since": "30 days ago",
     "hyperfind_ref": "AllHome"

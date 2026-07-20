@@ -178,7 +178,12 @@ def _build_body(
         return {"where": where}
 
     if style == BodyStyle.EMPLOYEE_SET_METRICS:
+        # timecard_metrics/multi_read: the selector field is "select" (an array); the accruals
+        # resources ride this endpoint with select=["ACCRUAL_SUMMARY"|"ACCRUAL_TRANSACTIONS"].
+        # An absent select makes the API return all resource rollups (the timecard_metrics default).
         body = dict(resource.body_template)
+        if sel:
+            body["select"] = sel
         employee_set: dict[str, Any] = {}
         if chunk:
             employee_set["employees"] = {"ids": chunk}
@@ -188,6 +193,29 @@ def _build_body(
             employee_set["dateRange"] = date_range
         body["where"] = {"employeeSet": employee_set}
         return body
+
+    if style == BodyStyle.SWAP_EMPLOYEES:
+        # where.employees is a criterion object: employees is an ARRAY of refs, start/end dates sit
+        # alongside it (NOT under where.dateRange). VERIFIED 200 live for employee_swap/multi_read.
+        emp_criterion: dict[str, Any] = {}
+        if chunk:
+            emp_criterion["employees"] = [{"id": emp_id} for emp_id in chunk]
+        if symbolic_period:
+            emp_criterion["symbolicPeriod"] = {"qualifier": symbolic_period}
+        elif date_range:
+            emp_criterion["startDate"] = date_range["startDate"]
+            emp_criterion["endDate"] = date_range["endDate"]
+        return {"where": {"employees": emp_criterion}}
+
+    if style == BodyStyle.LOCATIONS_QUERY:
+        # Legacy /commons/locations/multi_read: where.query is an org-map keyword search requiring a
+        # context ("ORG"), a snapshot date, and a query string q. date defaults to the run's upper
+        # bound (now). VERIFIED 200 live. body_template.query may override context/q.
+        snapshot = _as_date(until_iso) or datetime.now().strftime("%Y-%m-%d")
+        query: dict[str, Any] = {"context": "ORG", "q": "/"}
+        query.update(resource.body_template.get("query", {}))
+        query["date"] = snapshot
+        return {"where": {"query": query}}
 
     if style == BodyStyle.WHERE_EMPLOYEES_LIST:
         body = dict(resource.body_template)
@@ -213,17 +241,6 @@ def _build_body(
             where["endDateTime"] = end_dt
         body["where"] = where
         return body
-
-    if style == BodyStyle.INFO_ACCESS:
-        ref = int(hyperfind_ref) if hyperfind_ref and str(hyperfind_ref).lstrip("-").isdigit() else hyperfind_ref
-        employee_set: dict[str, Any] = {"hyperfind": {"id": ref}}
-        if symbolic_period:
-            employee_set["dateRange"] = {"symbolicPeriod": {"qualifier": symbolic_period}}
-        elif date_range:
-            employee_set["dateRange"] = date_range
-        # The Information Access API requires a non-empty select; fall back to a minimal person view.
-        keys = [{"key": k} for k in sel] if sel else [{"key": "EMP_COMMON_FULL_NAME"}]
-        return {"select": keys, "from": {"view": "EMP", "employeeSet": employee_set}}
 
     body: dict[str, Any] = dict(resource.body_template)
     if sel:

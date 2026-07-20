@@ -18,7 +18,7 @@ def test_effective_incremental_true_only_with_pk_and_incremental_load():
 
 
 def test_effective_incremental_false_for_keyless_resource_even_in_incremental_load():
-    keyless = get_resource("information_access")  # primary_key == []
+    keyless = get_resource("attestations")  # primary_key == []
     assert keyless.primary_key == []
     assert effective_incremental(keyless, incremental_load=True) is False
 
@@ -30,7 +30,7 @@ def test_keyless_incremental_window_ignores_watermark_uses_since_every_run():
     ignore it and re-fetch the full [since, now] window, so the full-REPLACE load never loses
     the older rows the shrunken watermark window would have dropped.
     """
-    keyless = get_resource("information_access")
+    keyless = get_resource("attestations")
     since = "2026-01-01T00:00:00+00:00"
     # Run 2 state: a watermark far later than `since` (what the buggy code would shrink to).
     state = {STATE_LAST_RUN: "2026-06-01T00:00:00+00:00"}

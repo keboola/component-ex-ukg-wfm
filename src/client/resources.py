@@ -71,8 +71,13 @@ class BodyStyle(StrEnum):
     #   "lastRunDateTime","endDateTime"}, "select":"SEGMENTS"} — shape VERIFIED (403 WFA-000030,
     #   Activities Integration API not licensed on this tenant), not a 200.
     NET_CHANGE_SEGMENTS = "net_change_segments"
-    # {"select": [{"key":...}], "from": {"view":"EMP","employeeSet":{"hyperfind":{"id":ref},"dateRange":{...}}}}
-    INFO_ACCESS = "info_access"
+    # {"where": {"employees": {"employees": [{"id":...}], "startDate","endDate"}}} — the swap
+    # "employees" criterion nests an ARRAY of employee refs plus its own start/end dates (NOT a
+    # {"ids":[...]} object). VERIFIED live 200 for scheduling/employee_swap/multi_read.
+    SWAP_EMPLOYEES = "swap_employees"
+    # {"where": {"query": {"context":"ORG", "date": <snapshot>, "q": "/"}}} — legacy
+    # /commons/locations/multi_read org-map keyword search. VERIFIED live 200 (root-list of org nodes).
+    LOCATIONS_QUERY = "locations_query"
     # body is emitted verbatim from body_template (no employee/date injection). Used by org-level
     # resources with a fixed criteria object (e.g. generic_locations).
     STATIC = "static"
@@ -104,27 +109,6 @@ class ResourceDef(BaseModel):
     primary_key: list[str] = Field(default_factory=list)
 
 
-def _date_window(name: str, family: str, endpoint_path: str) -> ResourceDef:
-    """Standard hyperfind-scoped date-windowed multi_read resource (≤500 emp/call).
-
-    NOTE: these paths were NOT confirmed against the live tenant (they 404 there). They are
-    retained for config back-compat pending authoritative path confirmation; the verified
-    resources below override the ones we could ground.
-    """
-    return ResourceDef(
-        name=name,
-        family=family,
-        method=HttpMethod.POST,
-        endpoint_path=endpoint_path,
-        employee_scope=EmployeeScope.HYPERFIND,
-        batch_limit=500,
-        pagination=PaginationStyle.MULTI_READ,
-        incremental_style=IncrementalStyle.DATE_WINDOW,
-        date_field="start",
-        primary_key=[],
-    )
-
-
 RESOURCE_REGISTRY: dict[str, ResourceDef] = {
     # VERIFIED live: POST /commons/persons/apply_read is a bulk (org-wide) read that pages via
     # count/index in the request body. Response envelope {"totalElements","records":[...]}.
@@ -143,22 +127,24 @@ RESOURCE_REGISTRY: dict[str, ResourceDef] = {
         records_key="records",
         primary_key=["personNumber"],
     ),
-    # VERIFIED live: /commons/business_structure/multi_read is 404 on this tenant. The authoritative
-    # path is /commons/generic_locations/multi_read, which requires the "Simplified Business
-    # Structure" feature switch (403 WCO-103232 here). The where accepts a locations criteria object;
-    # emitted verbatim. Response fields could not be confirmed (feature disabled) -> no PK (REPLACE).
+    # VERIFIED live: /commons/generic_locations/multi_read is 403 here ("Simplified Business Structure"
+    # feature off), so we use the legacy /commons/locations/multi_read, which returns 200 on this
+    # tenant. It is an org-map keyword search: where.query needs context ("ORG"), a snapshot date
+    # (defaulted to the run's upper bound), and a query string q ("/"). Response is a root-level list
+    # of org-map nodes keyed by nodeId. NOTE: q="/" returns the top/matching nodes; a full recursive
+    # descendantsOf traversal of the whole hierarchy is future work (see report).
     "business_structure": ResourceDef(
         name="business_structure",
         family="business_structure",
         method=HttpMethod.POST,
-        endpoint_path="/commons/generic_locations/multi_read",
-        body_style=BodyStyle.STATIC,
-        body_template={"where": {"locations": {"qualifiers": ["/"]}}},
+        endpoint_path="/commons/locations/multi_read",
+        body_style=BodyStyle.LOCATIONS_QUERY,
         employee_scope=EmployeeScope.NONE,
         batch_limit=0,
         pagination=PaginationStyle.NONE,
         incremental_style=IncrementalStyle.NONE,
-        primary_key=[],
+        records_key=None,
+        primary_key=["nodeId"],
     ),
     # VERIFIED against live tenant: GET returns {"hyperfindQueries": [{id,name,...}]}.
     "hyperfind_queries": ResourceDef(
@@ -173,24 +159,6 @@ RESOURCE_REGISTRY: dict[str, ResourceDef] = {
         incremental_style=IncrementalStyle.NONE,
         records_key="hyperfindQueries",
         primary_key=["id"],
-    ),
-    # VERIFIED path/body; returns {"metadata":{...,"cacheKey"}, "data":{...}} — a hierarchical
-    # node, NOT a tabular list. Scoped server-side via from.employeeSet.hyperfind.id (needs a
-    # hyperfind_ref). records_key="data" yields the single tree node as one flattened row; a
-    # proper tabular unnest of data.children is future work (see report).
-    "information_access": ResourceDef(
-        name="information_access",
-        family="information_access",
-        method=HttpMethod.POST,
-        endpoint_path="/commons/data/multi_read",
-        body_style=BodyStyle.INFO_ACCESS,
-        employee_scope=EmployeeScope.HYPERFIND_SERVER,
-        batch_limit=0,
-        pagination=PaginationStyle.NONE,
-        incremental_style=IncrementalStyle.DATE_WINDOW,
-        date_field="start",
-        records_key="data",
-        primary_key=[],
     ),
     # VERIFIED live: POST /timekeeping/punches/apply_read. where.employees.ids + where.dateRange with
     # DATETIME keys, count/index body paging. Response envelope {"metadata","data":[...]}; each data
@@ -230,23 +198,23 @@ RESOURCE_REGISTRY: dict[str, ResourceDef] = {
         primary_key=["employee_id", "startDate"],
     ),
     # VERIFIED live: POST /timekeeping/timecard_metrics/multi_read. Scope nests under
-    # where.employeeSet {dateRange, employees{ids}}; a top-level "metrics" array selects the rollups.
+    # where.employeeSet {dateRange, employees{ids}}; the selector is a top-level "select" array (NOT
+    # "metrics" — that key is silently ignored). With select empty the API returns ALL rollups.
     # Returns a root-level list, one entry per employee (musterReport*, scheduledTotals,
-    # accrualSummaryData, exceptioncounts, ...). PK = employeeId (one rolled-up row per employee).
+    # accrualSummaryData, exceptioncounts, ...); employeeId is an object -> flattened employeeId_id.
     "timekeeping_timecard_metrics": ResourceDef(
         name="timekeeping_timecard_metrics",
         family="timekeeping",
         method=HttpMethod.POST,
         endpoint_path="/timekeeping/timecard_metrics/multi_read",
         body_style=BodyStyle.EMPLOYEE_SET_METRICS,
-        body_template={"metrics": ["ACTUAL_HOURS"]},
         employee_scope=EmployeeScope.HYPERFIND,
         batch_limit=500,
         pagination=PaginationStyle.NONE,
         incremental_style=IncrementalStyle.DATE_WINDOW,
         date_field="start",
         records_key=None,
-        primary_key=["employeeId"],
+        primary_key=["employeeId_id"],
     ),
     # VERIFIED: /scheduling/schedule/multi_read returns a COMPOSITE of entity lists (shifts,
     # scheduleDayList, openShifts, holidays, ...). Three registry resources share this one
@@ -293,14 +261,76 @@ RESOURCE_REGISTRY: dict[str, ResourceDef] = {
         records_key="openShifts",
         primary_key=[],
     ),
-    # Authoritative path /scheduling/employee_swap/multi_read (old /scheduling/request_swaps 404s).
-    # UNRESOLVED body shape: every probed where.employees form (ids / employeeRefs / [{id}] /
-    # int-list / employeeSet / qualifiers) returns WFP-90009 "incorrect data type". Path is fixed
-    # but the request will 400 until the correct where schema for employee_swap is confirmed. TODO.
-    "scheduling_swaps": _date_window("scheduling_swaps", "scheduling", "/scheduling/employee_swap/multi_read"),
-    "accruals_balances": _date_window("accruals_balances", "accruals", "/accruals/balances/multi_read"),
-    "accruals_transactions": _date_window("accruals_transactions", "accruals", "/accruals/transactions/multi_read"),
-    "accruals_summaries": _date_window("accruals_summaries", "accruals", "/accruals/summary/multi_read"),
+    # VERIFIED live 200: POST /scheduling/employee_swap/multi_read. where.employees is a criterion
+    # object whose "employees" is an ARRAY of refs [{id}] with sibling startDate/endDate (see
+    # BodyStyle.SWAP_EMPLOYEES) — a bare {"ids":[...]} is rejected WFP-90009. Root-level list of
+    # swap requests. No row observed in the probe window (0 swaps), so PK stays empty (full REPLACE);
+    # the authoritative spec's stable key is the request `id` if a PK is wanted once rows are seen.
+    "scheduling_swaps": ResourceDef(
+        name="scheduling_swaps",
+        family="scheduling",
+        method=HttpMethod.POST,
+        endpoint_path="/scheduling/employee_swap/multi_read",
+        body_style=BodyStyle.SWAP_EMPLOYEES,
+        employee_scope=EmployeeScope.HYPERFIND,
+        batch_limit=500,
+        pagination=PaginationStyle.NONE,
+        incremental_style=IncrementalStyle.DATE_WINDOW,
+        date_field="start",
+        records_key=None,
+        primary_key=[],
+    ),
+    # VERIFIED live 200: the three accruals resources all ride POST /timekeeping/timecard_metrics/
+    # multi_read (there is no bulk /accruals/*/multi_read). They differ only by the `select` value.
+    # Response is a root-level list, one entry per employee; employeeId is an object -> employeeId_id
+    # is the stable PK. ACCRUAL_SUMMARY carries balances (accrualSummaryData[].dailySummaries[]
+    # .currentBalance/availableBalance*), so balances + summaries share that select; transactions
+    # uses ACCRUAL_TRANSACTIONS (accrualTransactions[]).
+    "accruals_balances": ResourceDef(
+        name="accruals_balances",
+        family="accruals",
+        method=HttpMethod.POST,
+        endpoint_path="/timekeeping/timecard_metrics/multi_read",
+        body_style=BodyStyle.EMPLOYEE_SET_METRICS,
+        select=["ACCRUAL_SUMMARY"],
+        employee_scope=EmployeeScope.HYPERFIND,
+        batch_limit=500,
+        pagination=PaginationStyle.NONE,
+        incremental_style=IncrementalStyle.DATE_WINDOW,
+        date_field="start",
+        records_key=None,
+        primary_key=["employeeId_id"],
+    ),
+    "accruals_transactions": ResourceDef(
+        name="accruals_transactions",
+        family="accruals",
+        method=HttpMethod.POST,
+        endpoint_path="/timekeeping/timecard_metrics/multi_read",
+        body_style=BodyStyle.EMPLOYEE_SET_METRICS,
+        select=["ACCRUAL_TRANSACTIONS"],
+        employee_scope=EmployeeScope.HYPERFIND,
+        batch_limit=500,
+        pagination=PaginationStyle.NONE,
+        incremental_style=IncrementalStyle.DATE_WINDOW,
+        date_field="start",
+        records_key=None,
+        primary_key=["employeeId_id"],
+    ),
+    "accruals_summaries": ResourceDef(
+        name="accruals_summaries",
+        family="accruals",
+        method=HttpMethod.POST,
+        endpoint_path="/timekeeping/timecard_metrics/multi_read",
+        body_style=BodyStyle.EMPLOYEE_SET_METRICS,
+        select=["ACCRUAL_SUMMARY"],
+        employee_scope=EmployeeScope.HYPERFIND,
+        batch_limit=500,
+        pagination=PaginationStyle.NONE,
+        incremental_style=IncrementalStyle.DATE_WINDOW,
+        date_field="start",
+        records_key=None,
+        primary_key=["employeeId_id"],
+    ),
     # VERIFIED: POST /leave/leave_cases/multi_read with top-level {"employees":{"ids"},"dateRange"}
     # (no "where" wrapper). Returns a root-level list.
     "leave_cases": ResourceDef(
@@ -334,7 +364,6 @@ RESOURCE_REGISTRY: dict[str, ResourceDef] = {
         records_key="leaveEdits",
         primary_key=[],
     ),
-    "leave_requests": _date_window("leave_requests", "leave", "/leave/requests/multi_read"),
     # VERIFIED live: POST /attendance/actions/multi_read with a top-level {employees{ids}, dateRange}
     # (no "where" wrapper). Returns a root-level list.
     "attendance_records": ResourceDef(
@@ -351,7 +380,6 @@ RESOURCE_REGISTRY: dict[str, ResourceDef] = {
         records_key=None,
         primary_key=[],
     ),
-    "attendance_patterns": _date_window("attendance_patterns", "attendance", "/attendance/patterns/multi_read"),
     # VERIFIED: POST /attendance/events/multi_read with top-level {"employees":{"ids"},"dateRange"}
     # (no "where" wrapper). Returns a root-level list.
     "attendance_events": ResourceDef(
@@ -386,12 +414,25 @@ RESOURCE_REGISTRY: dict[str, ResourceDef] = {
         records_key=None,
         primary_key=[],
     ),
-    # Authoritative path /work/employee_activities/multi_read (old /activities/multi_read 404s).
-    # UNRESOLVED body shape: with where.employees as {ids} the dateRange is rejected (WFP-90011);
-    # with employees as a list the request returns WFP-90009 "incorrect data type" for every date
-    # shape tried (dateRange{startDate,endDate} / {startDateTime,endDateTime} / employeeSet). Path
-    # is fixed but requests will 400 until the correct where schema is confirmed. TODO.
-    "work_activities": _date_window("work_activities", "work", "/work/employee_activities/multi_read"),
+    # Shape RESOLVED against the authoritative spec + live: POST /work/employee_activities/multi_read
+    # takes where.employees.ids and has NO dateRange (it returns the activities *assigned to* each
+    # employee, not a time-ranged transaction list) — hence date_field=None. On this tenant it 403s
+    # with WFA-000030 ("does not have access to Activities Integration API"), same licensing block as
+    # the other work/* resources, so a 200 could not be observed here. No stable PK -> full REPLACE.
+    "work_activities": ResourceDef(
+        name="work_activities",
+        family="work",
+        method=HttpMethod.POST,
+        endpoint_path="/work/employee_activities/multi_read",
+        body_style=BodyStyle.WHERE_EMPLOYEES_IDS,
+        employee_scope=EmployeeScope.HYPERFIND,
+        batch_limit=500,
+        pagination=PaginationStyle.NONE,
+        incremental_style=IncrementalStyle.NONE,
+        date_field=None,
+        records_key=None,
+        primary_key=[],
+    ),
     # Shape VERIFIED (403 WFA-000030: Activities Integration API not licensed on this tenant, so no
     # 200): where.employees.ids + where.dateRange{startDate,endDate} + top-level select "SEGMENTS".
     "work_activity_shifts": ResourceDef(
@@ -443,10 +484,15 @@ RESOURCE_REGISTRY: dict[str, ResourceDef] = {
         date_field=None,
         primary_key=[],
     ),
-    # Authoritative path /forecasting/volume_forecasts/multi_read (old /forecasting/volume 404s).
-    # UNRESOLVED: the where shape needs a non-empty `categoryDrivers` collection (WFF-270000) whose
-    # values are tenant-specific forecast driver refs not available to this probe. Path + where.
-    # dateRange are correct; the request 400s until categoryDrivers are supplied. TODO.
+    # Path /forecasting/volume_forecasts/multi_read confirmed. Authoritative where shape:
+    #   {"where": {"categoryDrivers": [{"category": {"id": <n>}, "drivers": {"ids": [...]}}],
+    #              "dateRange": {"startDate","endDate"}}}
+    # categoryDrivers must be non-empty (else WFF-270000) and its category/driver refs are
+    # TENANT-SPECIFIC (discover via GET /forecasting/category_profiles + GET /forecasting/
+    # volume_drivers). TODO: this tenant returns EMPTY lists for both volume_drivers and
+    # labor_standards — i.e. NO forecast categories/drivers are configured — so categoryDrivers
+    # cannot be populated and a 200 is unreachable here (WFF-270000). Wiring this up needs a config
+    # field carrying the tenant's category/driver refs (or a discovery pre-step); left as a TODO.
     "forecasting": ResourceDef(
         name="forecasting",
         family="forecasting",

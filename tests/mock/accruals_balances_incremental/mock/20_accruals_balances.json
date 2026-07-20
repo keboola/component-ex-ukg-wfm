@@ -1,8 +1,0 @@
-{
-  "url": "https://acme.prd.mykronos.com/api/v1/accruals/balances/multi_read",
-  "method": "POST",
-  "json": {"records": [
-    {"id": 1, "accrualCode": "VAC", "balanceHours": "40.0"},
-    {"id": 2, "accrualCode": "SICK", "balanceHours": "16.0"}
-  ]}
-}

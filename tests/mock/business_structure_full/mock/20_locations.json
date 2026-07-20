@@ -1,0 +1,22 @@
+{
+  "url": "https://acme.prd.mykronos.com/api/v1/commons/locations/multi_read",
+  "method": "POST",
+  "json": [
+    {
+      "nodeId": 101,
+      "name": "Acme Retail",
+      "fullName": "/Acme Retail",
+      "orgPath": "/Acme Retail",
+      "orgNodeTypeRef": {"id": 1, "qualifier": "Company"},
+      "persistentId": "acme-root"
+    },
+    {
+      "nodeId": 102,
+      "name": "Downtown Store",
+      "fullName": "/Acme Retail/Downtown Store",
+      "orgPath": "/Acme Retail/Downtown Store",
+      "orgNodeTypeRef": {"id": 2, "qualifier": "Location"},
+      "persistentId": "store-dt"
+    }
+  ]
+}
