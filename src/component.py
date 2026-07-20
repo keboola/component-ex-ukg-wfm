@@ -77,6 +77,9 @@ try:
             "dataSourceDisplayName", "label", "trackingLabel",
             "laborCategoryEntryDescription", "commentNotes", "commentsNotes",
             "comments", "comment", "notes",
+            # Org-path / hierarchy locators and free-text question/answer/message fields.
+            "path", "parentPath", "orgPath", "scope",
+            "question", "shortQuestion", "answer", "message",
         ]),
         UrlPatternSanitizer(patterns=[(r"[a-z0-9-]+\.prd\.mykronos\.com", "acme.prd.mykronos.com")]),
         CallbackSanitizer(before_response=_cap_response_records),
