@@ -33,7 +33,10 @@ EXPECTED_FAMILIES = {
 
 def test_row_schema_resource_enum_equals_registry_keys():
     """Gate: the configRowSchema `resource` enum must EXACTLY match the registry keys (same set
-    and order), and enum_titles must stay index-aligned."""
+    and order), and enum_titles must stay index-aligned. Skipped where component_config/ is not
+    checked out (the runtime Docker image ships only src/scripts/tests, not portal metadata)."""
+    if not _ROW_SCHEMA.exists():
+        pytest.skip("component_config/configRowSchema.json not present in this environment")
     schema = json.loads(_ROW_SCHEMA.read_text())
     resource_prop = schema["properties"]["resource"]
     enum = resource_prop["enum"]
