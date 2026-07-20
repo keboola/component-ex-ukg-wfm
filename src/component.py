@@ -24,11 +24,21 @@ from configuration import Configuration
 # keboola.vcr is a dev-only dependency (via keboola.datadirtest); the production image is built with
 # `uv sync --no-dev`, so guard the import — VCR_SANITIZERS is only consumed by the recording harness.
 try:
-    from keboola.vcr import DefaultSanitizer
-
-    VCR_SANITIZERS = [DefaultSanitizer(additional_sensitive_fields=["username"])]
+    from keboola.vcr import DefaultSanitizer, UrlPatternSanitizer
+    VCR_SANITIZERS = [
+        DefaultSanitizer(additional_sensitive_fields=[
+            "username", "firstName", "lastName", "fullName", "displayName",
+            "updateByPersonFullName", "personNumber",
+        ]),
+        UrlPatternSanitizer(patterns=[(r"[a-z0-9-]+\.prd\.mykronos\.com", "acme.prd.mykronos.com")]),
+    ]
 except ImportError:
     VCR_SANITIZERS = []
+
+# Some WFM responses (e.g. timecard_metrics) flatten into very large single fields that exceed
+# Python's default 128 KB csv field cap, crashing the phase-2 DictReader with
+# "_csv.Error: field larger than field limit". Raise the limit to a safe C-int max.
+csv.field_size_limit(2**31 - 1)
 
 _TIMESTAMP_FIELDS = {
     "createdDateTime",
@@ -110,6 +120,8 @@ class Component(ComponentBase):
             until_iso=until_iso,
             select=self._config.select,
             symbolic_period=self._config.symbolic_period,
+            page_size=self._config.page_size,
+            max_pages=self._config.max_pages,
         )
 
     def _stream_and_write_table(

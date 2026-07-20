@@ -87,6 +87,44 @@ def test_apply_read_pages_via_count_index():
         assert captured[0]["count"] == 1000
 
 
+def test_apply_read_page_size_overrides_count():
+    # page_size overrides resource.page_count as the per-page `count`; a single short page stops.
+    res = get_resource("persons")  # PaginationStyle.APPLY_READ, page_count=1000
+    captured: list[dict] = []
+    with requests_mock.Mocker() as m:
+        c = _client(m)
+
+        def _capture(request, context):
+            body = request.json()
+            captured.append(body)
+            # Return fewer than page_size (25) so the loop stops after one page.
+            return {"records": [{"personNumber": str(i)} for i in range(10)]}
+
+        m.post(f"{HOST}/api/v1{res.endpoint_path}", json=_capture)
+        rows = list(paginate_multi_read(c, res, {"where": {}}, page_size=25))
+        assert len(rows) == 10
+        assert len(captured) == 1
+        assert captured[0]["count"] == 25  # page_size overrode resource.page_count (1000)
+
+
+def test_apply_read_max_pages_caps_loop():
+    # max_pages caps the apply_read page loop even when every page is full (never short).
+    res = get_resource("persons")
+    captured: list[dict] = []
+    with requests_mock.Mocker() as m:
+        c = _client(m)
+
+        def _capture(request, context):
+            captured.append(request.json())
+            # Always a FULL page (== count) so the loop would run forever without the cap.
+            return {"records": [{"personNumber": str(i)} for i in range(5)]}
+
+        m.post(f"{HOST}/api/v1{res.endpoint_path}", json=_capture)
+        rows = list(paginate_multi_read(c, res, {"where": {}}, page_size=5, max_pages=2))
+        assert len(rows) == 10  # exactly 2 pages x 5 rows
+        assert [b["index"] for b in captured] == [0, 1]  # capped at 2 pages
+
+
 def test_apply_read_punches_body_shape():
     # punches apply_read: where.employees.ids + where.dateRange with DATETIME keys, count 1..25.
     res = get_resource("timekeeping_punches")

@@ -33,6 +33,10 @@ class Configuration(BaseModel):
     poll_interval_seconds: int = Field(default=15, ge=1)
     # Tenant-defined SQL-like query for the async payroll export (payroll_export resource only).
     payroll_query: str | None = None
+    # Sampling knobs (advanced/testing): override the apply_read page size and cap the number of
+    # pages fetched. Both default None so production behaviour is unaffected.
+    page_size: int | None = Field(default=None, ge=1)
+    max_pages: int | None = Field(default=None, ge=1)
 
     def __init__(self, **data: Any):
         try:

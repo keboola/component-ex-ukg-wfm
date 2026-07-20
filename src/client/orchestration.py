@@ -52,16 +52,24 @@ def resolve_employee_ids(
 _APPLY_READ_MAX_PAGES = 100_000  # safety cap so a misbehaving endpoint can't loop forever
 
 
-def paginate_multi_read(client: WfmClient, resource: ResourceDef, body: dict[str, Any]) -> Iterator[dict[str, Any]]:
+def paginate_multi_read(
+    client: WfmClient,
+    resource: ResourceDef,
+    body: dict[str, Any],
+    page_size: int | None = None,
+    max_pages: int | None = None,
+) -> Iterator[dict[str, Any]]:
     """Issue the read(s) for the given (already employee-batched) body and yield its records.
 
     multi_read endpoints return the full result set for the employee batch in a single response —
     they do NOT accept the commons cacheKey/count/index paging params (those return WFP-90011).
     Volume is bounded instead by employee batching in chunk_and_read, so that is one request per
     chunk. apply_read endpoints (persons, punches) page via count+index in the request body.
+
+    page_size/max_pages are optional sampling knobs for the apply_read paginator (see below).
     """
     if resource.pagination == PaginationStyle.APPLY_READ:
-        yield from _paginate_apply_read(client, resource, body)
+        yield from _paginate_apply_read(client, resource, body, page_size, max_pages)
         return
     if resource.method == HttpMethod.GET:
         result = client.get_json(resource.endpoint_path)
@@ -71,15 +79,23 @@ def paginate_multi_read(client: WfmClient, resource: ResourceDef, body: dict[str
 
 
 def _paginate_apply_read(
-    client: WfmClient, resource: ResourceDef, body: dict[str, Any]
+    client: WfmClient,
+    resource: ResourceDef,
+    body: dict[str, Any],
+    page_size: int | None = None,
+    max_pages: int | None = None,
 ) -> Iterator[dict[str, Any]]:
     """Page an apply_read endpoint via count+index in the request body.
 
     Loop incrementing the 0-based page `index`, injecting `count` (page size), until a page returns
     fewer than `count` records. `body` already carries the where clause from _build_body.
+
+    Sampling knobs (both default None → prod unaffected): `page_size` overrides the per-page `count`
+    (else resource.page_count); `max_pages` caps how many pages the loop fetches.
     """
-    count = resource.page_count or 100
-    for index in range(_APPLY_READ_MAX_PAGES):
+    count = page_size if page_size else (resource.page_count or 100)
+    page_limit = min(max_pages, _APPLY_READ_MAX_PAGES) if max_pages else _APPLY_READ_MAX_PAGES
+    for index in range(page_limit):
         page_body = {**body, "index": index, "count": count}
         result = client.post_json(resource.endpoint_path, page_body)
         records = extract_records(result, resource.records_key)
@@ -97,12 +113,14 @@ def chunk_and_read(
     select: list[str],
     symbolic_period: str | None = None,
     hyperfind_ref: str | None = None,
+    page_size: int | None = None,
+    max_pages: int | None = None,
 ) -> Iterator[dict[str, Any]]:
     chunk_size = resource.batch_limit or len(emp_ids) or 1
     chunks = _initial_chunks(emp_ids, chunk_size) if emp_ids else [[]]
     for chunk in chunks:
         yield from _read_chunk_with_shrink(
-            client, resource, chunk, since_iso, until_iso, select, symbolic_period, hyperfind_ref
+            client, resource, chunk, since_iso, until_iso, select, symbolic_period, hyperfind_ref, page_size, max_pages
         )
 
 
@@ -115,12 +133,14 @@ def _read_chunk_with_shrink(
     select: list[str],
     symbolic_period: str | None = None,
     hyperfind_ref: str | None = None,
+    page_size: int | None = None,
+    max_pages: int | None = None,
 ) -> Iterator[dict[str, Any]]:
     size = len(chunk) or 1
     while True:
         try:
             body = _build_body(resource, chunk, since_iso, until_iso, select, symbolic_period, hyperfind_ref)
-            yield from paginate_multi_read(client, resource, body)
+            yield from paginate_multi_read(client, resource, body, page_size, max_pages)
             return
         except PayloadTooLargeError:
             if size <= 1:
@@ -130,7 +150,8 @@ def _read_chunk_with_shrink(
             # Re-run the sub-chunks at the smaller size.
             for sub in _initial_chunks(chunk, size):
                 yield from _read_chunk_with_shrink(
-                    client, resource, sub, since_iso, until_iso, select, symbolic_period, hyperfind_ref
+                    client, resource, sub, since_iso, until_iso, select, symbolic_period, hyperfind_ref,
+                    page_size, max_pages,
                 )
             return
 
@@ -312,6 +333,8 @@ def iter_records(
     until_iso: str | None,
     select: list[str],
     symbolic_period: str | None = None,
+    page_size: int | None = None,
+    max_pages: int | None = None,
 ) -> Iterator[dict[str, Any]]:
     emp_ids: list[int] = []
     if resource.employee_scope == EmployeeScope.HYPERFIND:
@@ -333,7 +356,9 @@ def iter_records(
     # A symbolic period (e.g. "Current Pay Period") replaces the date window entirely; the
     # caller has already skipped window/watermark logic, so read once with the symbolic bound.
     if symbolic_period:
-        yield from chunk_and_read(client, resource, emp_ids, "", "", select, symbolic_period, hyperfind_ref)
+        yield from chunk_and_read(
+            client, resource, emp_ids, "", "", select, symbolic_period, hyperfind_ref, page_size, max_pages
+        )
         return
 
     # NET_CHANGE resources are treated as a plain date window (case-2 full refresh): they
@@ -347,9 +372,11 @@ def iter_records(
         # Sub-hour granularity for endpoints with a per-call window cap (punches <= 60 min).
         for w_start, w_end in split_date_windows(start, end, max_minutes=resource.window_max_minutes):
             yield from chunk_and_read(
-                client, resource, emp_ids, w_start.isoformat(), w_end.isoformat(), select, None, hyperfind_ref
+                client, resource, emp_ids, w_start.isoformat(), w_end.isoformat(), select, None, hyperfind_ref,
+                page_size, max_pages,
             )
     else:
         yield from chunk_and_read(
-            client, resource, emp_ids, since_iso or "", until_iso or "", select, None, hyperfind_ref
+            client, resource, emp_ids, since_iso or "", until_iso or "", select, None, hyperfind_ref,
+            page_size, max_pages,
         )

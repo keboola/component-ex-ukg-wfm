@@ -210,6 +210,20 @@
         }
       },
       "propertyOrder": 100
+    },
+    "page_size": {
+      "type": "integer",
+      "title": "Page Size (advanced)",
+      "description": "Advanced/testing: override the per-page record count for paginated (apply_read) resources such as People/Persons and Punches. Leave empty to use the resource default.",
+      "minimum": 1,
+      "propertyOrder": 110
+    },
+    "max_pages": {
+      "type": "integer",
+      "title": "Max Pages (advanced)",
+      "description": "Advanced/testing: cap the number of pages fetched for paginated (apply_read) resources. Leave empty for no cap.",
+      "minimum": 1,
+      "propertyOrder": 120
     }
   }
 }
