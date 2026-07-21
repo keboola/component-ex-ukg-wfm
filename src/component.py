@@ -228,7 +228,9 @@ class Component(ComponentBase):
                     data_types=BaseType(
                         dtype=(SupportedDataTypes.TIMESTAMP if col in _TIMESTAMP_FIELDS else SupportedDataTypes.STRING)
                     ),
-                    nullable=True,
+                    # Primary-key columns must be non-nullable — Keboola Storage rejects a PK
+                    # defined on a nullable column when the output table is created.
+                    nullable=col not in resource.primary_key,
                     primary_key=col in resource.primary_key,
                 )
                 for col in columns
