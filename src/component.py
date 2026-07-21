@@ -11,7 +11,13 @@ from keboola.component.exceptions import UserException
 
 from client.orchestration import iter_records
 from client.payroll import run_async_export
-from client.resources import IncrementalStyle, ResourceDef, effective_incremental, get_resource
+from client.resources import (
+    IncrementalStyle,
+    ResourceDef,
+    effective_incremental,
+    effective_primary_key,
+    get_resource,
+)
 from client.transform import flatten_record
 from client.wfm_client import WfmClient
 from client.window import STATE_LAST_RUN, resolve_window
@@ -132,21 +138,20 @@ class Component(ComponentBase):
 
     def _effective_incremental(self, resource: ResourceDef) -> bool:
         """The one predicate governing watermark, fetch window, and manifest flag (see resources)."""
-        return effective_incremental(resource, self._config.incremental)
+        return effective_incremental(resource, self._config.incremental, self._config.primary_key)
 
     def _compute_window(self, resource: ResourceDef, state: dict[str, Any]) -> tuple[str | None, str | None, str]:
         """Return (since_iso, until_iso, run_started_iso)."""
         # A symbolic period replaces the date window; skip window and watermark logic.
         if self._config.symbolic_period:
             return None, None, datetime.now(UTC).isoformat()
-        date_field = self._config.date_field or resource.date_field
+        date_field = resource.date_field
         if not date_field:
             return None, None, datetime.now(UTC).isoformat()
         return resolve_window(
             state,
             date_field,
             self._config.since,
-            self._config.overlap_margin_seconds,
             self._effective_incremental(resource),
         )
 
@@ -221,8 +226,10 @@ class Component(ComponentBase):
             if row_count == 0:
                 return 0, []
 
-            # Phase 2: sorted columns → deterministic manifest schema across incremental runs
+            # Phase 2: sorted columns → deterministic manifest schema across incremental runs.
+            # Effective PK = the user-supplied primary_key if set, else the resource registry default.
             columns = sorted(seen_columns)
+            primary_key = effective_primary_key(resource, self._config.primary_key)
             schema = {
                 col: ColumnDefinition(
                     data_types=BaseType(
@@ -230,17 +237,17 @@ class Component(ComponentBase):
                     ),
                     # Primary-key columns must be non-nullable — Keboola Storage rejects a PK
                     # defined on a nullable column when the output table is created.
-                    nullable=col not in resource.primary_key,
-                    primary_key=col in resource.primary_key,
+                    nullable=col not in primary_key,
+                    primary_key=col in primary_key,
                 )
                 for col in columns
             }
             # Same predicate as the watermark and window logic: incremental append/upsert
-            # only with a stable PK; a keyless resource always full-REPLACEs.
+            # only with a stable PK; a keyless resource with no user PK always full-REPLACEs.
             is_incremental = self._effective_incremental(resource)
             table = self.create_out_table_definition(
                 f"{resource.name}.csv",
-                primary_key=resource.primary_key,
+                primary_key=primary_key,
                 incremental=is_incremental,
                 has_header=True,
                 schema=schema,

@@ -25,11 +25,11 @@ _PARAMS = {
 }
 
 
-def _make_datadir(tmp_path: Path) -> Path:
+def _make_datadir(tmp_path: Path, params: dict | None = None) -> Path:
     data_dir = tmp_path / "data"
     (data_dir / "out" / "tables").mkdir(parents=True)
     (data_dir / "in" / "tables").mkdir(parents=True)
-    (data_dir / "config.json").write_text(json.dumps({"parameters": _PARAMS}))
+    (data_dir / "config.json").write_text(json.dumps({"parameters": params or _PARAMS}))
     return data_dir
 
 
@@ -40,9 +40,58 @@ def component(tmp_path, monkeypatch) -> Component:
     return Component()
 
 
+def _build_component(tmp_path, monkeypatch, params: dict) -> Component:
+    data_dir = _make_datadir(tmp_path, params)
+    monkeypatch.setenv("KBC_DATADIR", str(data_dir))
+    return Component()
+
+
+def _manifest(data_dir: Path, table: str) -> dict:
+    return json.loads((data_dir / "out" / "tables" / f"{table}.csv.manifest").read_text())
+
+
 def _schema_by_col(data_dir: Path, table: str) -> dict[str, dict]:
-    manifest = json.loads((data_dir / "out" / "tables" / f"{table}.csv.manifest").read_text())
-    return {col["name"]: col for col in manifest["schema"]}
+    return {col["name"]: col for col in _manifest(data_dir, table)["schema"]}
+
+
+def test_user_primary_key_drives_manifest_and_incremental_on_keyless_resource(tmp_path, monkeypatch):
+    """A user-supplied primary_key sets the manifest PK and enables incremental upsert
+    on an otherwise-registry-keyless resource."""
+    params = {**_PARAMS, "resource": "attestations", "load_type": "incremental_load", "primary_key": ["id"]}
+    component = _build_component(tmp_path, monkeypatch, params)
+    resource = get_resource("attestations")
+    assert resource.primary_key == []  # keyless in the registry
+
+    records = iter([{"id": "A1", "value": "x"}])
+    row_count, _ = component._stream_and_write_table(resource, records)
+    assert row_count == 1
+
+    manifest = _manifest(tmp_path / "data", "attestations")
+    # PK enables incremental upsert; the PK is carried per-column in the schema.
+    assert manifest["incremental"] is True
+
+    cols = _schema_by_col(tmp_path / "data", "attestations")
+    assert cols["id"].get("nullable", False) is False
+    assert cols["id"]["primary_key"] is True
+    assert cols["value"]["nullable"] is True
+    assert cols["value"].get("primary_key", False) is False
+
+
+def test_keyless_incremental_without_user_pk_stays_full_replace(tmp_path, monkeypatch):
+    """Keyless resource + incremental_load + no user PK stays incremental=false (non-breaking)."""
+    params = {**_PARAMS, "resource": "attestations", "load_type": "incremental_load"}
+    component = _build_component(tmp_path, monkeypatch, params)
+    resource = get_resource("attestations")
+
+    records = iter([{"id": "A1", "value": "x"}])
+    component._stream_and_write_table(resource, records)
+
+    manifest = _manifest(tmp_path / "data", "attestations")
+    assert manifest.get("incremental", False) is False
+
+    # No column is flagged as a primary key.
+    cols = _schema_by_col(tmp_path / "data", "attestations")
+    assert all(col.get("primary_key", False) is False for col in cols.values())
 
 
 def test_pk_columns_non_nullable_others_nullable(component, tmp_path):

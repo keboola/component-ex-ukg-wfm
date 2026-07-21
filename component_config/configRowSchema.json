@@ -75,26 +75,11 @@
     "since": {
       "type": "string",
       "title": "Start Date",
-      "description": "Lower bound for the first incremental run. ISO 8601 (e.g. `2026-01-01T00:00:00+00:00`) or a relative phrase (e.g. `30 days ago`, `yesterday`). Ignored once a state watermark exists.",
+      "description": "Lower bound of the API fetch window. ISO 8601 (e.g. `2026-01-01T00:00:00+00:00`) or a relative phrase (e.g. `30 days ago`, `yesterday`).",
       "options": {
-        "dependencies": {
-          "load_type": "incremental_load"
-        }
+        "tooltip": "Bounds the API fetch and is independent of Load Type. For a primary-key resource on incremental load it seeds the first run, after which the stored state watermark takes over. For full load (and any keyless resource) it is applied on every run."
       },
       "propertyOrder": 30
-    },
-    "overlap_margin_seconds": {
-      "type": "integer",
-      "title": "Overlap Margin (seconds)",
-      "description": "Seconds subtracted from the last watermark to re-capture late-arriving / retro-edited records.",
-      "default": 0,
-      "minimum": 0,
-      "options": {
-        "dependencies": {
-          "load_type": "incremental_load"
-        }
-      },
-      "propertyOrder": 40
     },
     "hyperfind_ref": {
       "type": "string",
@@ -166,22 +151,24 @@
     "symbolic_period": {
       "type": "string",
       "title": "Symbolic Period",
-      "description": "Optional symbolic period (e.g. `Current Pay Period`) for resources that support period-based reads instead of an explicit date window.",
+      "description": "Optional symbolic period used instead of an explicit start/end date window.",
       "options": {
-        "dependencies": {
-          "load_type": "incremental_load"
-        }
+        "tooltip": "Symbolic periods are UKG-named relative period ranges (e.g. `Current Pay Period`, `Previous Pay Period`, `Yesterday`, `Today`) supplied to the API instead of an explicit start/end date. Applies only to date-windowed resources; ignored otherwise. See the UKG Pro WFM API reference: https://developer.ukg.com/wfm/reference"
       },
       "propertyOrder": 70
     },
-    "date_field": {
-      "type": "string",
-      "title": "Date Field Override",
-      "description": "Advanced: override the datetime field used for the incremental window. Leave empty to use the resource default.",
+    "primary_key": {
+      "type": "array",
+      "title": "Primary Key",
+      "description": "Column(s) that uniquely identify a row; used to upsert on incremental load.",
+      "items": {
+        "type": "string"
+      },
       "options": {
         "dependencies": {
           "load_type": "incremental_load"
-        }
+        },
+        "tooltip": "Column name(s) forming the output table's primary key. On incremental load the component upserts on these columns and the manifest is written incrementally. Supplying a primary key enables incremental upsert even for resources that have no primary key in the built-in registry. Leave empty to use the resource's registry default (a keyless resource then stays full-replace)."
       },
       "propertyOrder": 80
     },

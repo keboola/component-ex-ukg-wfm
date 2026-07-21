@@ -65,7 +65,10 @@ Incremental & windowing
 =======================
 
 - Incremental resources store the last window end in per-row `state.json`; the next run reads
-  `[last_end − overlap, now]`.
+  `[last_end, now]`.
+- **Start Date (`since`)** bounds the API fetch and is independent of the load type. It seeds the
+  first run of a primary-key resource on incremental load (state watermark takes over afterwards),
+  and is applied on every run for full load and for keyless resources.
 - The window is split into **≤365-day sub-windows** to respect service limits; employee sets are
   chunked by each resource's per-call batch limit (≤500 for most, 100 for persons, 50 for activity
   net-changes) and adaptively **halved on HTTP 413**.
@@ -74,7 +77,9 @@ Incremental & windowing
   persisted change-token.
 - For effectively-incremental resources the watermark advances **even on an empty result** to prevent
   unbounded window growth.
-- **Incremental requires a stable primary key.** Resources without one always run full-load
+- **Incremental requires a primary key.** A resource upserts incrementally only when a primary key
+  exists — either its registry default or one supplied via the row's `primary_key` field. A
+  registry-keyless resource with no user-supplied `primary_key` always runs full-replace
   (incremental-without-PK would append unboundedly).
 
 Payroll async export

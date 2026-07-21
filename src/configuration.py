@@ -24,11 +24,12 @@ class Configuration(BaseModel):
     resource: str | None = None
     load_type: LoadType = LoadType.INCREMENTAL
     since: str | None = None
-    overlap_margin_seconds: int = Field(default=0, ge=0)
     symbolic_period: str | None = None
     hyperfind_ref: str | None = None
     select: list[str] = Field(default_factory=list)
-    date_field: str | None = None
+    # User-supplied primary key for the output table. Overrides the resource registry default and,
+    # on incremental load, enables upsert even for a registry-keyless resource.
+    primary_key: list[str] = Field(default_factory=list)
     max_wait_seconds: int = Field(default=1800, ge=1)
     poll_interval_seconds: int = Field(default=15, ge=1)
     # Tenant-defined SQL-like query for the async payroll export (payroll_export resource only).

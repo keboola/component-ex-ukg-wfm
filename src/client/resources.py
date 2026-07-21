@@ -516,17 +516,25 @@ def get_resource(name: str) -> ResourceDef:
         raise UserException(f"Unknown resource '{name}'. Valid resources: {', '.join(RESOURCE_REGISTRY)}") from e
 
 
-def effective_incremental(resource: ResourceDef, incremental_load: bool) -> bool:
+def effective_primary_key(resource: ResourceDef, config_pk: list[str] | None = None) -> list[str]:
+    """The primary key for the output table: the user-supplied one wins over the registry default."""
+    return config_pk or resource.primary_key
+
+
+def effective_incremental(
+    resource: ResourceDef, incremental_load: bool, config_pk: list[str] | None = None
+) -> bool:
     """Single source of truth for whether a run is *effectively* incremental.
 
     A run behaves incrementally (append/upsert with PK dedup, a state watermark, and
-    a [last_run - overlap, now] window) ONLY when the user selected incremental_load
-    AND the resource has a stable primary key to upsert against.
+    a [last_run, now] window) ONLY when the user selected incremental_load AND there is a
+    stable primary key to upsert against — either the resource registry default OR a
+    user-supplied `primary_key`.
 
-    Without a PK, an incremental append would duplicate rows unboundedly, so such a
+    Without any PK, an incremental append would duplicate rows unboundedly, so such a
     resource must run as a full REPLACE every run (case-2 full refresh) regardless of
     the configured load type. This one predicate governs all three of: reading/advancing
     the state watermark, computing the fetch window, and the manifest `incremental` flag.
     They must never disagree.
     """
-    return incremental_load and bool(resource.primary_key)
+    return incremental_load and bool(effective_primary_key(resource, config_pk))

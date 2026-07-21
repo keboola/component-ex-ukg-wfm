@@ -1,6 +1,6 @@
 from datetime import UTC, datetime, timedelta
 
-from client.window import STATE_LAST_RUN, compute_window, parse_since, split_date_windows
+from client.window import compute_window, parse_since, split_date_windows
 
 
 def test_parse_since_naive_iso_is_normalized_to_utc():
@@ -34,13 +34,7 @@ def test_split_over_max_chunks_by_max_days():
 
 
 def test_compute_window_first_run_uses_since():
-    params, run_started = compute_window({}, "start", "2026-01-01T00:00:00+00:00", 0)
+    params, run_started = compute_window({}, "start", "2026-01-01T00:00:00+00:00")
     assert params["start_since"] == "2026-01-01T00:00:00+00:00"
     assert "start_until" in params
     assert run_started
-
-
-def test_compute_window_applies_overlap_to_watermark():
-    state = {STATE_LAST_RUN: "2026-06-01T00:00:00+00:00"}
-    params, _ = compute_window(state, "start", None, 3600)
-    assert params["start_since"] == "2026-05-31T23:00:00+00:00"

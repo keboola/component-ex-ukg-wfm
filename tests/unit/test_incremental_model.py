@@ -23,6 +23,21 @@ def test_effective_incremental_false_for_keyless_resource_even_in_incremental_lo
     assert effective_incremental(keyless, incremental_load=True) is False
 
 
+def test_effective_incremental_true_when_user_pk_supplied_on_keyless_resource():
+    """A user-supplied primary_key enables incremental upsert even for a registry-keyless resource."""
+    keyless = get_resource("attestations")
+    assert keyless.primary_key == []
+    assert effective_incremental(keyless, incremental_load=True, config_pk=["id"]) is True
+    # Still gated by load type: full_load with a user PK is not effectively incremental.
+    assert effective_incremental(keyless, incremental_load=False, config_pk=["id"]) is False
+
+
+def test_effective_incremental_false_when_no_pk_anywhere():
+    """Keyless resource + incremental_load + no user PK stays full-replace (non-breaking)."""
+    keyless = get_resource("attestations")
+    assert effective_incremental(keyless, incremental_load=True, config_pk=[]) is False
+
+
 def test_keyless_incremental_window_ignores_watermark_uses_since_every_run():
     """Regression: a keyless incremental_load resource must NOT shrink its window on run 2.
 
@@ -39,7 +54,6 @@ def test_keyless_incremental_window_ignores_watermark_uses_since_every_run():
         state,
         keyless.date_field or "start",
         since,
-        overlap_seconds=0,
         is_effective_incremental=effective_incremental(keyless, incremental_load=True),
     )
 
@@ -47,8 +61,8 @@ def test_keyless_incremental_window_ignores_watermark_uses_since_every_run():
     assert until_iso is not None
 
 
-def test_effective_incremental_window_uses_watermark_with_overlap():
-    """The HR-style path (PK + incremental_load) reads the watermark and applies overlap."""
+def test_effective_incremental_window_uses_watermark():
+    """The HR-style path (PK + incremental_load) reads the watermark as the lower bound verbatim."""
     persons = get_resource("persons")
     state = {STATE_LAST_RUN: "2026-06-01T00:00:00+00:00"}
 
@@ -56,8 +70,7 @@ def test_effective_incremental_window_uses_watermark_with_overlap():
         state,
         "start",
         since=None,
-        overlap_seconds=3600,
         is_effective_incremental=effective_incremental(persons, incremental_load=True),
     )
 
-    assert since_iso == "2026-05-31T23:00:00+00:00"  # watermark minus 1h overlap
+    assert since_iso == "2026-06-01T00:00:00+00:00"  # watermark used as-is (no overlap)
