@@ -53,6 +53,10 @@ def run_async_export(
         raise UserException("Payroll export submit did not return an executionKey.")
     state = (submitted.get("state") or "").upper() if isinstance(submitted, dict) else ""
 
+    # Fail fast if the submit itself already reported a terminal failure — otherwise a FAILED/CANCELLED
+    # execution that never appears in the poll listing would burn the full max_wait before erroring.
+    if state in _TERMINAL_FAIL:
+        raise UserException(f"Payroll export {execution_key} submit returned terminal state {state}.")
     if state not in _TERMINAL_OK:
         state = _poll_until_terminal(client, resource, execution_key, max_wait_s, poll_interval_s, sleep)
 

@@ -85,6 +85,18 @@ def test_async_export_raises_on_failed_state():
             _run(c)
 
 
+def test_async_export_fails_fast_on_terminal_submit_state():
+    # A terminal-failure state already in the SUBMIT response must raise immediately, never poll
+    # (else a failed execution missing from the listing would burn the full max_wait).
+    with requests_mock.Mocker() as m:
+        c = _client(m)
+        m.post(ASYNC_URL, status_code=202, json={"executionKey": "EK1", "state": "FAILED"})
+        poll = m.get(ASYNC_URL, json={"records": []})
+        with pytest.raises(UserException):
+            _run(c)
+        assert poll.call_count == 0  # failed fast, no polling
+
+
 def test_async_export_raises_user_exception_on_download_failure():
     with requests_mock.Mocker() as m:
         c = _client(m)

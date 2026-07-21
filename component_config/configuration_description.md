@@ -16,7 +16,7 @@ Use the **Test Connection** button to mint a token and verify credentials.
 |---|---|
 | `resource` | The WFM resource to extract (see the resource dropdown / README table). |
 | `load_type` | `full_load` or `incremental_load`. Resources without a stable primary key always run full-load. |
-| `since` | Lower bound for the first incremental run — ISO 8601 or a relative phrase (`30 days ago`). Ignored once a state watermark exists. |
+| `since` | Lower bound (ISO 8601 or a relative phrase like `30 days ago`). For incremental resources with a stable primary key it seeds the first run, after which the state watermark supersedes it; resources without a stable key (and any `full_load`) apply `since` on every run. |
 | `overlap_margin_seconds` | Seconds subtracted from the watermark to re-capture late/retro-edited records. |
 | `hyperfind_ref` | Hyperfind query id/name resolving the employee-ID set. Empty = tenant `All Home` default (employee-scoped resources only). |
 | `select` | Optional list of API `select` elements; empty uses the resource default. |
