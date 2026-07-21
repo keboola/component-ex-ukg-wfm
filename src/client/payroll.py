@@ -4,7 +4,7 @@ import tempfile
 import time
 import uuid
 from collections.abc import Callable, Iterator
-from typing import Any
+from typing import Any, cast
 
 import requests
 from keboola.component.exceptions import UserException
@@ -111,7 +111,9 @@ def _download_and_parse_csv(
             resp.encoding = resp.encoding or "utf-8"
             for chunk in resp.iter_content(chunk_size=_DOWNLOAD_CHUNK_BYTES, decode_unicode=True):
                 if chunk:
-                    tmp.write(chunk)
+                    # decode_unicode=True yields str at runtime, but requests' stub types
+                    # iter_content as bytes; cast so the text-mode temp file write type-checks.
+                    tmp.write(cast(str, chunk))
             tmp.seek(0)
             reader = csv.DictReader(tmp)
             for row in reader:

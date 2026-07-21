@@ -57,7 +57,8 @@ def compute_window(
                 raise UserException(f"Invalid ISO 8601 datetime value '{watermark}': {e}") from e
         else:
             # User-supplied since: supports both ISO and relative phrases.
-            lower = parse_since(since)  # type: ignore[arg-type]
+            # In this branch watermark is falsy, so lower_str == since and is a non-empty str.
+            lower = parse_since(lower_str)
         if watermark and overlap_seconds:
             lower = lower - timedelta(seconds=overlap_seconds)
         params[f"{date_field}_since"] = lower.isoformat()

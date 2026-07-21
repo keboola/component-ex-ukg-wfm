@@ -37,7 +37,7 @@ def test_keyless_incremental_window_ignores_watermark_uses_since_every_run():
 
     since_iso, until_iso, _ = resolve_window(
         state,
-        keyless.date_field,
+        keyless.date_field or "start",
         since,
         overlap_seconds=0,
         is_effective_incremental=effective_incremental(keyless, incremental_load=True),
