@@ -1,0 +1,39 @@
+{
+  "_metadata": {
+    "freeze_time": "2026-07-20T12:00:00",
+    "keboola_vcr_version": "0.5.0",
+    "recorded_at": "2026-07-20T14:46:33.278596+00:00"
+  },
+  "interactions": [
+    {
+      "request": {
+        "body": "grant_type=password&username=REDACTED&password=REDACTED&client_id=REDACTED&client_secret=REDACTED&auth_chain=OAuthLdapService",
+        "headers": {
+          "Accept": [
+            "application/json"
+          ],
+          "Content-Type": [
+            "application/x-www-form-urlencoded"
+          ]
+        },
+        "method": "POST",
+        "uri": "https://acme.prd.mykronos.com/api/authentication/access_token"
+      },
+      "response": {
+        "body": {
+          "string": "{\"access_token\": \"REDACTED\", \"token_type\": \"bearer\", \"expires_in\": 3600, \"refresh_token\": \"REDACTED\", \"scope\": \"REDACTED\"}"
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "status": {
+          "code": 200,
+          "message": "OK"
+        }
+      }
+    }
+  ],
+  "version": 1
+}

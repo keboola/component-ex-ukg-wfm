@@ -1,0 +1,49 @@
+{
+  "files": {},
+  "hash_algorithm": "sha256",
+  "tables": {
+    "timekeeping_timecards.csv": {
+      "columns": [
+        "activitySegments",
+        "activityShifts",
+        "activityTeamMemberships",
+        "activityTotals",
+        "dailyTotalSummary",
+        "employee_id",
+        "employee_name",
+        "employee_qualifier",
+        "exceptions",
+        "extendedExceptions",
+        "hasPendingChanges",
+        "historicalCorrections",
+        "hoursWorked",
+        "itemTotalSummary",
+        "lastUpdates",
+        "missingTimeGroups",
+        "moveAmounts",
+        "ota",
+        "payCodeEdits",
+        "processedSegments",
+        "punches",
+        "scheduleShifts",
+        "scheduledTotals",
+        "startDate",
+        "totalSummary",
+        "totalizationStatus",
+        "totals",
+        "workHolidayCredits",
+        "workedShifts"
+      ],
+      "hash": "sha256:9902ec2044d99159ba4d30d788a6dda084b106bc80b19e96d0fd4eb6191a7021",
+      "row_count": 4,
+      "size_bytes": 326035
+    },
+    "timekeeping_timecards.csv.manifest": {
+      "columns": null,
+      "hash": "sha256:1eba54eee848afaf8d4f36dc904abb7e40cb2a32830837c4db931224de439700",
+      "row_count": null,
+      "size_bytes": 4644
+    }
+  },
+  "version": "1.0"
+}

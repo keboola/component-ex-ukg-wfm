@@ -1,0 +1,36 @@
+{
+  "files": {},
+  "hash_algorithm": "sha256",
+  "tables": {
+    "scheduling_open_shifts.csv": {
+      "columns": [
+        "commentNotes",
+        "deleted",
+        "endDateTime",
+        "generated",
+        "id",
+        "label",
+        "locked",
+        "modifiedDateTime",
+        "open",
+        "posted",
+        "postedNotificationPending",
+        "relations",
+        "segments",
+        "selfServiced",
+        "startDateTime",
+        "version"
+      ],
+      "hash": "sha256:c7b8dad553ed64de4344e07cd963bce18d059efaccfffc63bfc098cf2800f0a3",
+      "row_count": 174,
+      "size_bytes": 129526
+    },
+    "scheduling_open_shifts.csv.manifest": {
+      "columns": null,
+      "hash": "sha256:d5a7680357897eb974d0a9382892cc07971b464b2767139a6bbc6ccc0c32a56a",
+      "row_count": null,
+      "size_bytes": 2541
+    }
+  },
+  "version": "1.0"
+}

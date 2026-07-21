@@ -1,0 +1,458 @@
+[
+  {
+    "name": "01_testConnection",
+    "description": "Test API connection with valid credentials",
+    "config": {
+      "action": "testConnection",
+      "parameters": {
+        "host": "https://acme.prd.mykronos.com",
+        "client_id": "DUMMY_CLIENT_ID",
+        "#client_secret": "DUMMY_CLIENT_SECRET",
+        "username": "DUMMY_USER",
+        "#password": "DUMMY_PASSWORD"
+      }
+    }
+  },
+  {
+    "name": "02_persons",
+    "description": "Download resource 'persons' (full load)",
+    "config": {
+      "action": "run",
+      "parameters": {
+        "host": "https://acme.prd.mykronos.com",
+        "client_id": "DUMMY_CLIENT_ID",
+        "#client_secret": "DUMMY_CLIENT_SECRET",
+        "username": "DUMMY_USER",
+        "#password": "DUMMY_PASSWORD",
+        "resource": "persons",
+        "hyperfind_ref": "253",
+        "load_type": "full_load",
+        "page_size": 25,
+        "max_pages": 2
+      }
+    }
+  },
+  {
+    "name": "03_business_structure",
+    "description": "Download resource 'business_structure' (full load)",
+    "config": {
+      "action": "run",
+      "parameters": {
+        "host": "https://acme.prd.mykronos.com",
+        "client_id": "DUMMY_CLIENT_ID",
+        "#client_secret": "DUMMY_CLIENT_SECRET",
+        "username": "DUMMY_USER",
+        "#password": "DUMMY_PASSWORD",
+        "resource": "business_structure",
+        "hyperfind_ref": "253",
+        "load_type": "full_load"
+      }
+    }
+  },
+  {
+    "name": "04_hyperfind_queries",
+    "description": "Download resource 'hyperfind_queries' (full load)",
+    "config": {
+      "action": "run",
+      "parameters": {
+        "host": "https://acme.prd.mykronos.com",
+        "client_id": "DUMMY_CLIENT_ID",
+        "#client_secret": "DUMMY_CLIENT_SECRET",
+        "username": "DUMMY_USER",
+        "#password": "DUMMY_PASSWORD",
+        "resource": "hyperfind_queries",
+        "hyperfind_ref": "253",
+        "load_type": "full_load"
+      }
+    }
+  },
+  {
+    "name": "05_timekeeping_punches",
+    "description": "Download resource 'timekeeping_punches' (windowed)",
+    "config": {
+      "action": "run",
+      "parameters": {
+        "host": "https://acme.prd.mykronos.com",
+        "client_id": "DUMMY_CLIENT_ID",
+        "#client_secret": "DUMMY_CLIENT_SECRET",
+        "username": "DUMMY_USER",
+        "#password": "DUMMY_PASSWORD",
+        "resource": "timekeeping_punches",
+        "hyperfind_ref": "253",
+        "load_type": "incremental_load",
+        "since": "2026-07-19T00:00:00+00:00"
+      }
+    }
+  },
+  {
+    "name": "06_timekeeping_timecards",
+    "description": "Download resource 'timekeeping_timecards' (windowed)",
+    "config": {
+      "action": "run",
+      "parameters": {
+        "host": "https://acme.prd.mykronos.com",
+        "client_id": "DUMMY_CLIENT_ID",
+        "#client_secret": "DUMMY_CLIENT_SECRET",
+        "username": "DUMMY_USER",
+        "#password": "DUMMY_PASSWORD",
+        "resource": "timekeeping_timecards",
+        "hyperfind_ref": "253",
+        "load_type": "incremental_load",
+        "since": "2026-04-21T00:00:00+00:00"
+      }
+    }
+  },
+  {
+    "name": "07_timekeeping_timecard_metrics",
+    "description": "Download resource 'timekeeping_timecard_metrics' (windowed)",
+    "config": {
+      "action": "run",
+      "parameters": {
+        "host": "https://acme.prd.mykronos.com",
+        "client_id": "DUMMY_CLIENT_ID",
+        "#client_secret": "DUMMY_CLIENT_SECRET",
+        "username": "DUMMY_USER",
+        "#password": "DUMMY_PASSWORD",
+        "resource": "timekeeping_timecard_metrics",
+        "hyperfind_ref": "253",
+        "load_type": "incremental_load",
+        "since": "2026-04-21T00:00:00+00:00"
+      }
+    }
+  },
+  {
+    "name": "08_scheduling_schedules",
+    "description": "Download resource 'scheduling_schedules' (windowed)",
+    "config": {
+      "action": "run",
+      "parameters": {
+        "host": "https://acme.prd.mykronos.com",
+        "client_id": "DUMMY_CLIENT_ID",
+        "#client_secret": "DUMMY_CLIENT_SECRET",
+        "username": "DUMMY_USER",
+        "#password": "DUMMY_PASSWORD",
+        "resource": "scheduling_schedules",
+        "hyperfind_ref": "253",
+        "load_type": "incremental_load",
+        "since": "2026-04-21T00:00:00+00:00"
+      }
+    }
+  },
+  {
+    "name": "09_scheduling_shifts",
+    "description": "Download resource 'scheduling_shifts' (windowed)",
+    "config": {
+      "action": "run",
+      "parameters": {
+        "host": "https://acme.prd.mykronos.com",
+        "client_id": "DUMMY_CLIENT_ID",
+        "#client_secret": "DUMMY_CLIENT_SECRET",
+        "username": "DUMMY_USER",
+        "#password": "DUMMY_PASSWORD",
+        "resource": "scheduling_shifts",
+        "hyperfind_ref": "253",
+        "load_type": "incremental_load",
+        "since": "2026-04-21T00:00:00+00:00"
+      }
+    }
+  },
+  {
+    "name": "10_scheduling_open_shifts",
+    "description": "Download resource 'scheduling_open_shifts' (windowed)",
+    "config": {
+      "action": "run",
+      "parameters": {
+        "host": "https://acme.prd.mykronos.com",
+        "client_id": "DUMMY_CLIENT_ID",
+        "#client_secret": "DUMMY_CLIENT_SECRET",
+        "username": "DUMMY_USER",
+        "#password": "DUMMY_PASSWORD",
+        "resource": "scheduling_open_shifts",
+        "hyperfind_ref": "253",
+        "load_type": "incremental_load",
+        "since": "2026-04-21T00:00:00+00:00"
+      }
+    }
+  },
+  {
+    "name": "11_scheduling_swaps",
+    "description": "Download resource 'scheduling_swaps' (windowed)",
+    "config": {
+      "action": "run",
+      "parameters": {
+        "host": "https://acme.prd.mykronos.com",
+        "client_id": "DUMMY_CLIENT_ID",
+        "#client_secret": "DUMMY_CLIENT_SECRET",
+        "username": "DUMMY_USER",
+        "#password": "DUMMY_PASSWORD",
+        "resource": "scheduling_swaps",
+        "hyperfind_ref": "253",
+        "load_type": "incremental_load",
+        "since": "2026-04-21T00:00:00+00:00"
+      }
+    }
+  },
+  {
+    "name": "12_accruals_balances",
+    "description": "Download resource 'accruals_balances' (windowed)",
+    "config": {
+      "action": "run",
+      "parameters": {
+        "host": "https://acme.prd.mykronos.com",
+        "client_id": "DUMMY_CLIENT_ID",
+        "#client_secret": "DUMMY_CLIENT_SECRET",
+        "username": "DUMMY_USER",
+        "#password": "DUMMY_PASSWORD",
+        "resource": "accruals_balances",
+        "hyperfind_ref": "253",
+        "load_type": "incremental_load",
+        "since": "2026-04-21T00:00:00+00:00"
+      }
+    }
+  },
+  {
+    "name": "13_accruals_transactions",
+    "description": "Download resource 'accruals_transactions' (windowed)",
+    "config": {
+      "action": "run",
+      "parameters": {
+        "host": "https://acme.prd.mykronos.com",
+        "client_id": "DUMMY_CLIENT_ID",
+        "#client_secret": "DUMMY_CLIENT_SECRET",
+        "username": "DUMMY_USER",
+        "#password": "DUMMY_PASSWORD",
+        "resource": "accruals_transactions",
+        "hyperfind_ref": "253",
+        "load_type": "incremental_load",
+        "since": "2026-04-21T00:00:00+00:00"
+      }
+    }
+  },
+  {
+    "name": "14_accruals_summaries",
+    "description": "Download resource 'accruals_summaries' (windowed)",
+    "config": {
+      "action": "run",
+      "parameters": {
+        "host": "https://acme.prd.mykronos.com",
+        "client_id": "DUMMY_CLIENT_ID",
+        "#client_secret": "DUMMY_CLIENT_SECRET",
+        "username": "DUMMY_USER",
+        "#password": "DUMMY_PASSWORD",
+        "resource": "accruals_summaries",
+        "hyperfind_ref": "253",
+        "load_type": "incremental_load",
+        "since": "2026-04-21T00:00:00+00:00"
+      }
+    }
+  },
+  {
+    "name": "15_leave_cases",
+    "description": "Download resource 'leave_cases' (windowed)",
+    "config": {
+      "action": "run",
+      "parameters": {
+        "host": "https://acme.prd.mykronos.com",
+        "client_id": "DUMMY_CLIENT_ID",
+        "#client_secret": "DUMMY_CLIENT_SECRET",
+        "username": "DUMMY_USER",
+        "#password": "DUMMY_PASSWORD",
+        "resource": "leave_cases",
+        "hyperfind_ref": "253",
+        "load_type": "incremental_load",
+        "since": "2026-04-21T00:00:00+00:00"
+      }
+    }
+  },
+  {
+    "name": "16_leave_edits",
+    "description": "Download resource 'leave_edits' (windowed)",
+    "config": {
+      "action": "run",
+      "parameters": {
+        "host": "https://acme.prd.mykronos.com",
+        "client_id": "DUMMY_CLIENT_ID",
+        "#client_secret": "DUMMY_CLIENT_SECRET",
+        "username": "DUMMY_USER",
+        "#password": "DUMMY_PASSWORD",
+        "resource": "leave_edits",
+        "hyperfind_ref": "253",
+        "load_type": "incremental_load",
+        "since": "2026-04-21T00:00:00+00:00"
+      }
+    }
+  },
+  {
+    "name": "17_attendance_records",
+    "description": "Download resource 'attendance_records' (windowed)",
+    "config": {
+      "action": "run",
+      "parameters": {
+        "host": "https://acme.prd.mykronos.com",
+        "client_id": "DUMMY_CLIENT_ID",
+        "#client_secret": "DUMMY_CLIENT_SECRET",
+        "username": "DUMMY_USER",
+        "#password": "DUMMY_PASSWORD",
+        "resource": "attendance_records",
+        "hyperfind_ref": "253",
+        "load_type": "incremental_load",
+        "since": "2026-04-21T00:00:00+00:00"
+      }
+    }
+  },
+  {
+    "name": "18_attendance_events",
+    "description": "Download resource 'attendance_events' (windowed)",
+    "config": {
+      "action": "run",
+      "parameters": {
+        "host": "https://acme.prd.mykronos.com",
+        "client_id": "DUMMY_CLIENT_ID",
+        "#client_secret": "DUMMY_CLIENT_SECRET",
+        "username": "DUMMY_USER",
+        "#password": "DUMMY_PASSWORD",
+        "resource": "attendance_events",
+        "hyperfind_ref": "253",
+        "load_type": "incremental_load",
+        "since": "2026-04-21T00:00:00+00:00"
+      }
+    }
+  },
+  {
+    "name": "19_attestations",
+    "description": "Download resource 'attestations' (windowed)",
+    "config": {
+      "action": "run",
+      "parameters": {
+        "host": "https://acme.prd.mykronos.com",
+        "client_id": "DUMMY_CLIENT_ID",
+        "#client_secret": "DUMMY_CLIENT_SECRET",
+        "username": "DUMMY_USER",
+        "#password": "DUMMY_PASSWORD",
+        "resource": "attestations",
+        "hyperfind_ref": "253",
+        "load_type": "incremental_load",
+        "since": "2026-04-21T00:00:00+00:00"
+      }
+    }
+  },
+  {
+    "name": "20_work_activities",
+    "description": "Download resource 'work_activities' (full load)",
+    "config": {
+      "action": "run",
+      "parameters": {
+        "host": "https://acme.prd.mykronos.com",
+        "client_id": "DUMMY_CLIENT_ID",
+        "#client_secret": "DUMMY_CLIENT_SECRET",
+        "username": "DUMMY_USER",
+        "#password": "DUMMY_PASSWORD",
+        "resource": "work_activities",
+        "hyperfind_ref": "253",
+        "load_type": "full_load"
+      }
+    }
+  },
+  {
+    "name": "21_work_activity_shifts",
+    "description": "Download resource 'work_activity_shifts' (windowed)",
+    "config": {
+      "action": "run",
+      "parameters": {
+        "host": "https://acme.prd.mykronos.com",
+        "client_id": "DUMMY_CLIENT_ID",
+        "#client_secret": "DUMMY_CLIENT_SECRET",
+        "username": "DUMMY_USER",
+        "#password": "DUMMY_PASSWORD",
+        "resource": "work_activity_shifts",
+        "hyperfind_ref": "253",
+        "load_type": "incremental_load",
+        "since": "2026-04-21T00:00:00+00:00"
+      }
+    }
+  },
+  {
+    "name": "22_work_activity_net_changes",
+    "description": "Download resource 'work_activity_net_changes' (windowed)",
+    "config": {
+      "action": "run",
+      "parameters": {
+        "host": "https://acme.prd.mykronos.com",
+        "client_id": "DUMMY_CLIENT_ID",
+        "#client_secret": "DUMMY_CLIENT_SECRET",
+        "username": "DUMMY_USER",
+        "#password": "DUMMY_PASSWORD",
+        "resource": "work_activity_net_changes",
+        "hyperfind_ref": "253",
+        "load_type": "incremental_load",
+        "since": "2026-04-21T00:00:00+00:00"
+      }
+    }
+  },
+  {
+    "name": "23_payroll_export",
+    "description": "Download resource 'payroll_export' (windowed)",
+    "config": {
+      "action": "run",
+      "parameters": {
+        "host": "https://acme.prd.mykronos.com",
+        "client_id": "DUMMY_CLIENT_ID",
+        "#client_secret": "DUMMY_CLIENT_SECRET",
+        "username": "DUMMY_USER",
+        "#password": "DUMMY_PASSWORD",
+        "resource": "payroll_export",
+        "hyperfind_ref": "253",
+        "load_type": "incremental_load",
+        "since": "2026-04-21T00:00:00+00:00",
+        "payroll_query": "SELECT 1"
+      }
+    }
+  },
+  {
+    "name": "24_forecasting",
+    "description": "Download resource 'forecasting' (windowed)",
+    "config": {
+      "action": "run",
+      "parameters": {
+        "host": "https://acme.prd.mykronos.com",
+        "client_id": "DUMMY_CLIENT_ID",
+        "#client_secret": "DUMMY_CLIENT_SECRET",
+        "username": "DUMMY_USER",
+        "#password": "DUMMY_PASSWORD",
+        "resource": "forecasting",
+        "hyperfind_ref": "253",
+        "load_type": "incremental_load",
+        "since": "2026-04-21T00:00:00+00:00"
+      }
+    }
+  },
+  {
+    "name": "25_invalid_resource",
+    "description": "Unknown resource name \u2192 UserException, exit code 1",
+    "config": {
+      "action": "run",
+      "parameters": {
+        "host": "https://acme.prd.mykronos.com",
+        "client_id": "DUMMY_CLIENT_ID",
+        "#client_secret": "DUMMY_CLIENT_SECRET",
+        "username": "DUMMY_USER",
+        "#password": "DUMMY_PASSWORD",
+        "resource": "__does_not_exist__"
+      }
+    }
+  },
+  {
+    "name": "26_missing_resource",
+    "description": "Run without a resource selected \u2192 UserException, exit code 1",
+    "config": {
+      "action": "run",
+      "parameters": {
+        "host": "https://acme.prd.mykronos.com",
+        "client_id": "DUMMY_CLIENT_ID",
+        "#client_secret": "DUMMY_CLIENT_SECRET",
+        "username": "DUMMY_USER",
+        "#password": "DUMMY_PASSWORD"
+      }
+    }
+  }
+]

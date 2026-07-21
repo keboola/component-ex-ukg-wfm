@@ -1,0 +1,71 @@
+{
+  "_metadata": {
+    "freeze_time": "2026-07-20T12:00:00",
+    "keboola_vcr_version": "0.5.0",
+    "recorded_at": "2026-07-20T14:46:36.171046+00:00"
+  },
+  "interactions": [
+    {
+      "request": {
+        "body": "grant_type=password&username=REDACTED&password=REDACTED&client_id=REDACTED&client_secret=REDACTED&auth_chain=OAuthLdapService",
+        "headers": {
+          "Accept": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "159"
+          ],
+          "Content-Type": [
+            "application/x-www-form-urlencoded"
+          ]
+        },
+        "method": "POST",
+        "uri": "https://acme.prd.mykronos.com/api/authentication/access_token"
+      },
+      "response": {
+        "body": {
+          "string": "{\"access_token\": \"REDACTED\", \"refresh_token\": \"REDACTED\", \"scope\": \"REDACTED\", \"id_token\": \"REDACTED\", \"token_type\": \"Bearer\", \"expires_in\": 1799}"
+        },
+        "headers": {
+          "Content-Length": [
+            "1235"
+          ],
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "status": {
+          "code": 200,
+          "message": "OK"
+        }
+      }
+    },
+    {
+      "request": {
+        "body": null,
+        "headers": {
+          "Accept": [
+            "application/json"
+          ]
+        },
+        "method": "GET",
+        "uri": "https://acme.prd.mykronos.com/api/v1/commons/hyperfind"
+      },
+      "response": {
+        "body": {
+          "string": "{\"hyperfindQueries\": [{\"id\": 4553, \"name\": \"REDACTED\", \"description\": \"REDACTED\", \"visibility\": {\"id\": 1, \"name\": \"REDACTED\"}, \"usageType\": \"Regular\", \"persistentId\": \"_UKG#Support#-#Future#Hires\"}, {\"id\": 4354, \"name\": \"REDACTED\", \"description\": \"REDACTED\", \"visibility\": {\"id\": 1, \"name\": \"REDACTED\"}, \"usageType\": \"Regular\", \"persistentId\": \"CARTS#CBGC\"}, {\"id\": 2754, \"name\": \"REDACTED\", \"description\": \"REDACTED\", \"visibility\": {\"id\": 1, \"name\": \"REDACTED\"}, \"usageType\": \"Regular\", \"persistentId\": \"Ad#hoc1768932050759\"}, {\"id\": 1453, \"name\": \"REDACTED\", \"description\": \"REDACTED\", \"visibility\": {\"id\": 1, \"name\": \"REDACTED\"}, \"usageType\": \"Regular\", \"persistentId\": \"Ash#Brook#Golf\"}, {\"id\": 658, \"name\": \"REDACTED\", \"description\": \"REDACTED\", \"visibility\": {\"id\": 1, \"name\": \"REDACTED\"}, \"usageType\": \"Regular\", \"persistentId\": \"All#1\"}, {\"id\": 659, \"name\": \"REDACTED\", \"description\": \"REDACTED\", \"visibility\": {\"id\": 1, \"name\": \"REDACTED\"}, \"usageType\": \"Regular\", \"persistentId\": \"All#2\"}, {\"id\": 660, \"name\": \"REDACTED\", \"description\": \"REDACTED\", \"visibility\": {\"id\": 1, \"name\": \"REDACTED\"}, \"usageType\": \"Regular\", \"persistentId\": \"All#3\"}, {\"id\": 661, \"name\": \"REDACTED\", \"description\": \"REDACTED\", \"visibility\": {\"id\": 1, \"name\": \"REDACTED\"}, \"usageType\": \"Regular\", \"persistentId\": \"All#4\"}, {\"id\": 662, \"name\": \"REDACTED\", \"description\": \"REDACTED\", \"visibility\": {\"id\": 1, \"name\": \"REDACTED\"}, \"usageType\": \"Regular\", \"persistentId\": \"All#5\"}, {\"id\": -13, \"name\": \"REDACTED\", \"description\": \"REDACTED\", \"visibility\": {\"id\": 1, \"name\": \"REDACTED\"}, \"usageType\": \"Regular\", \"persistentId\": \"&All_Agency_Employee\"}, {\"id\": 56, \"name\": \"REDACTED\", \"description\": \"REDACTED\", \"visibility\": {\"id\": 1, \"name\": \"REDACTED\"}, \"usageType\": \"Regular\", \"persistentId\": \"&All_Communications_Users\"}, {\"id\": 1760, \"name\": \"REDACTED\", \"description\": \"REDACTED\", \"visibility\": {\"id\": 1, \"name\": \"REDACTED\"}, \"usageType\": \"Regular\", \"persistentId\": \"ALL#FB\"}, {\"id\": 1, \"name\": \"REDACTED\", \"description\": \"REDACTED\", \"visibility\": {\"id\": 1, \"name\": \"REDACTED\"}, \"usageType\": \"Regular\", \"persistentId\": \"&Person.All_Home\"}, {\"id\": -3, \"name\": \"REDACTED\", \"description\": \"REDACTED\", \"visibility\": {\"id\": 1, \"name\": \"REDACTED\"}, \"usageType\": \"Regular\", \"persistentId\": \"&All_Home_And_Scheduled_In\"}, {\"id\": -2, \"name\": \"REDACTED\", \"description\": \"REDACTED\", \"visibility\": {\"id\": 1, \"name\": \"REDACTED\"}, \"usageType\": \"Regular\", \"inclusiveExclusivefilterType\": \"Inclusive\", \"persistentId\": \"&All_Home_And_Transferred_In\"}, {\"id\": 3, \"name\": \"REDACTED\", \"description\": \"REDACTED\", \"visibility\": {\"id\": 1, \"name\": \"REDACTED\"}, \"usageType\": \"Regular\", \"persistentId\": \"0-ST#All#Managers\"}, {\"id\": -9, \"name\": \"REDACTED\", \"description\": \"REDACTED\", \"visibility\": {\"id\": 1, \"name\": \"REDACTED\"}, \"usageType\": \"Regular\", \"persistentId\": \"&All_People\"}, {\"id\": 1761, \"name\": \"REDACTED\", \"description\": \"REDACTED\", \"visibility\": {\"id\": 1, \"name\": \"REDACTED\"}, \"usageType\": \"Regular\", \"persistentId\": \"All#Pro#Shop#TCO\"}, {\"id\": 3403, \"name\": \"REDACTED\", \"description\": \"REDACTED\", \"visibility\": {\"id\": 1, \"name\": \"REDACTED\"}, \"usageType\": \"Regular\", \"persistentId\": \"All#Rose#City\"}, {\"id\": 3355, \"name\": \"REDACTED\", \"description\": \"REDACTED\", \"visibility\": {\"id\": 1, \"name\": \"REDACTED\"}, \"usageType\": \"Regular\", \"persistentId\": \"All#Rose#City#2\"}, {\"id\": 1354, \"name\": \"REDACTED\", \"description\": \"REDACTED\", \"visibility\": {\"id\": 1, \"name\": \"REDACTED\"}, \"usageType\": \"Regular\", \"persistentId\": \"Ad#hoc1762098246293\"}, {\"id\": 4003, \"name\": \"REDACTED\", \"description\": \"REDACTED\", \"visibility\": {\"id\": 1, \"name\": \"REDACTED\"}, \"usageType\": \"Regular\", \"persistentId\": \"Ash#Brook#Culinary\"}, {\"id\": 3853, \"name\": \"REDACTED\", \"description\": \"REDACTED\", \"visibility\": {\"id\": 1, \"name\": \"REDACTED\"}, \"usageType\": \"Regular\", \"persistentId\": \"Ash#Brook#Golf1773147311238\"}, {\"id\": 154, \"name\": \"REDACTED\", \"description\": \"REDACTED\", \"visibility\": {\"id\": 1, \"name\": \"REDACTED\"}, \"usageType\": \"Regular\", \"persistentId\": \"Attendance#Processor\"}, {\"id\": 853, \"name\": \"REDACTED\", \"description\": \"REDACTED\", \"visibility\": {\"id\": 1, \"name\": \"REDACTED\"}, \"usageType\": \"Regular\", \"persistentId\": \"Banquet\"}]}"
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json;charset=utf-8"
+          ]
+        },
+        "status": {
+          "code": 200,
+          "message": "OK"
+        }
+      }
+    }
+  ],
+  "version": 1
+}

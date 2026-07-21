@@ -1,0 +1,48 @@
+{
+  "files": {},
+  "hash_algorithm": "sha256",
+  "tables": {
+    "timekeeping_timecard_metrics.csv": {
+      "columns": [
+        "absenceExceptionData_employee_id",
+        "absenceExceptionData_employee_name",
+        "absenceExceptionData_employee_qualifier",
+        "absenceExceptionData_isExcusedAbsence",
+        "absenceExceptionData_isUnexcusedAbsence",
+        "absenceExceptionsWithPosition",
+        "accrualSummaryData",
+        "accrualTransactions",
+        "actualTotals",
+        "actualTotalsExcludeCorrections",
+        "dailyActualTotalSummary",
+        "dailyProjectedTotalSummary",
+        "dailyScheduledTotalSummary",
+        "employeeId_id",
+        "employeeId_name",
+        "employeeId_qualifier",
+        "exceptioncounts",
+        "exceptioncountsUnreviewed",
+        "ftptData",
+        "ftptDataAll",
+        "musterReportDailyData",
+        "musterReportSummaryData",
+        "projectedTotals",
+        "projectedTotalsExcludeCorrections",
+        "scheduledTotals",
+        "shiftActualTotalSummary",
+        "shiftProjectedTotalSummary",
+        "shiftScheduledTotalSummary"
+      ],
+      "hash": "sha256:63c7cb8450efda5bcdd6e86f25c2ad64ea68e6093b5fecebb56ab0f4036f2691",
+      "row_count": 4,
+      "size_bytes": 1832037
+    },
+    "timekeeping_timecard_metrics.csv.manifest": {
+      "columns": null,
+      "hash": "sha256:c737888eccab3fbb5bcfc9373a27df6ae97e6a2442a2382773142dda506e72d8",
+      "row_count": null,
+      "size_bytes": 4730
+    }
+  },
+  "version": "1.0"
+}

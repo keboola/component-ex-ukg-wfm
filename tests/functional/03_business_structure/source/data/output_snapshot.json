@@ -1,0 +1,37 @@
+{
+  "files": {},
+  "hash_algorithm": "sha256",
+  "tables": {
+    "business_structure.csv": {
+      "columns": [
+        "contextRef_id",
+        "contextRef_qualifier",
+        "description",
+        "effectiveDate",
+        "expirationDate",
+        "firstRevision",
+        "fullName",
+        "lastRevision",
+        "name",
+        "nodeId",
+        "orgNodeTypeRef_id",
+        "orgNodeTypeRef_qualifier",
+        "orgPath",
+        "parentNodeRef_id",
+        "parentNodeRef_qualifier",
+        "persistentId",
+        "transferable"
+      ],
+      "hash": "sha256:51f1445ab1623c155893a5354c2d82f1b1c52a0e463630ad3244362e3ce1867c",
+      "row_count": 2,
+      "size_bytes": 398
+    },
+    "business_structure.csv.manifest": {
+      "columns": null,
+      "hash": "sha256:67fb4df557885c6a41316d2dd11ca9c37e7ceab4f1fe8b18b3c5da875ac0f274",
+      "row_count": null,
+      "size_bytes": 2774
+    }
+  },
+  "version": "1.0"
+}

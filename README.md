@@ -30,8 +30,9 @@ Authentication & provisioning
   Developer Admin must create the service account. The legacy `appkey` is not used.
 - **Tokens:** access token lifetime is unpublished, so the client refreshes proactively from
   `expires_in` minus a safety margin, using `grant_type=refresh_token` when available.
-- **No public sandbox** → live authentication and the cf-dev smoke test are **deferred** until a
-  customer sandbox tenant is supplied (see Known limitations).
+- **No public sandbox:** there is no self-service WFM sandbox, so credentials come from a
+  provisioned customer/partner tenant. The contract has been validated against a live tenant (see
+  Known limitations for the two license-gated families).
 
 Supported resources
 ===================
@@ -86,11 +87,13 @@ result. The download and all scratch files stage in `/tmp`, never under `data/ou
 Testing
 =======
 
-- Unit tests: token/refresh, chunking + 413 shrink, ≤365-day window splitting, cacheKey
-  pagination, payroll poll ceiling.
+- Unit tests: token/refresh, chunking + 413 shrink, window splitting, apply_read count/index
+  paging, payroll poll ceiling.
 - datadir mock tests (`tests/mock/`): one synthetic fixture per family plus an auth-failure case.
-- VCR functional tests are **deferred** — cassettes must be *recorded* from a real tenant, which
-  requires credentials that do not exist yet (see blockers below). They are not hand-authored.
+- VCR functional tests (`tests/functional/`): recorded against a real tenant and replayed
+  deterministically in CI (no network, no credentials). Cassettes are **sanitized** — the tenant
+  host is rewritten to a placeholder and employee PII / identifying fields are redacted — and
+  volume-capped (≤25 records/array). Re-record with `component-developer:generate-vcr-tests`.
 
 Run the suite and lint:
 
@@ -102,13 +105,17 @@ uv run ruff check src/ tests/
 Known limitations / blockers
 ============================
 
-- **No public UKG WFM sandbox.** The live auth check, VCR recording (real cassettes), and the
-  cf-dev smoke test are all blocked until a customer sandbox tenant with a provisioned service
-  account and minted `client_id`/`client_secret` is available. Once supplied, record VCR cassettes
-  with `component-developer:generate-vcr-tests` (record mode), then run `testConnection` and a
-  `timekeeping_punches` job to verify. Local coverage today is unit + datadir mock tests only.
-- Endpoint paths and primary keys reflect best-known documented WFM shapes; because the engine is
-  data-driven, correcting any path/PK is a one-line registry edit in `src/client/resources.py`.
+- The endpoint contract (paths, request bodies, envelopes, primary keys) is **verified against a
+  live WFM tenant**. Two resource families could not return data on that tenant and are documented
+  but unverified end-to-end: **Work/Activities** (`work_activities`, `work_activity_shifts`,
+  `work_activity_net_changes`) require the Activities Integration API license (HTTP 403
+  `WFA-000030`), and **forecasting** requires tenant-configured `categoryDrivers` (`WFF-270000`).
+  Their request shapes are set from the reference docs; enable on a licensed/configured tenant.
+- `timekeeping_punches` is a near-real-time reader: the API caps it at a 60-minute window per call
+  (count ≤ 25), so a wide backfill fans out into many calls — prefer short, frequent incremental
+  windows over large date ranges.
+- `payroll_export` needs a tenant-specific SQL `payroll_query`; `forecasting` needs the tenant's
+  volume-driver/category refs. Both are configuration inputs, not defaults.
 
 Development
 -----------

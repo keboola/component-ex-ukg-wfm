@@ -1,0 +1,21 @@
+{
+  "files": {},
+  "hash_algorithm": "sha256",
+  "tables": {
+    "attestations.csv": {
+      "columns": [
+        "attestationDailyDetail"
+      ],
+      "hash": "sha256:336ef5c686914147b051b920145553f76f88e3beb6e2ab9ebc8aa2f7b55c82b1",
+      "row_count": 2,
+      "size_bytes": 69124
+    },
+    "attestations.csv.manifest": {
+      "columns": null,
+      "hash": "sha256:99955a07eec3f68428d1dcdc42669c58afd44790eabd45ba88665227af201f5e",
+      "row_count": null,
+      "size_bytes": 320
+    }
+  },
+  "version": "1.0"
+}

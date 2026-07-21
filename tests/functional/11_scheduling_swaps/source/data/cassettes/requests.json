@@ -1,0 +1,109 @@
+{
+  "_metadata": {
+    "freeze_time": "2026-07-20T12:00:00",
+    "keboola_vcr_version": "0.5.0",
+    "recorded_at": "2026-07-20T14:46:59.498840+00:00"
+  },
+  "interactions": [
+    {
+      "request": {
+        "body": "grant_type=password&username=REDACTED&password=REDACTED&client_id=REDACTED&client_secret=REDACTED&auth_chain=OAuthLdapService",
+        "headers": {
+          "Accept": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "159"
+          ],
+          "Content-Type": [
+            "application/x-www-form-urlencoded"
+          ]
+        },
+        "method": "POST",
+        "uri": "https://acme.prd.mykronos.com/api/authentication/access_token"
+      },
+      "response": {
+        "body": {
+          "string": "{\"access_token\": \"REDACTED\", \"refresh_token\": \"REDACTED\", \"scope\": \"REDACTED\", \"id_token\": \"REDACTED\", \"token_type\": \"Bearer\", \"expires_in\": 1799}"
+        },
+        "headers": {
+          "Content-Length": [
+            "1235"
+          ],
+          "Content-Type": [
+            "application/json;charset=UTF-8"
+          ]
+        },
+        "status": {
+          "code": 200,
+          "message": "OK"
+        }
+      }
+    },
+    {
+      "request": {
+        "body": "{\"hyperfind\": {\"id\": 253}, \"dateRange\": {\"startDate\": \"2026-04-21\", \"endDate\": \"2026-07-20\"}}",
+        "headers": {
+          "Accept": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "93"
+          ],
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "method": "POST",
+        "uri": "https://acme.prd.mykronos.com/api/v1/commons/hyperfind/execute"
+      },
+      "response": {
+        "body": {
+          "string": "{\"count\": 3, \"result\": {\"refs\": [{\"id\": 756, \"qualifier\": \"REDACTED\"}, {\"id\": 1002, \"qualifier\": \"REDACTED\"}, {\"id\": 1003, \"qualifier\": \"REDACTED\"}], \"basePersons\": [{\"personId\": 756, \"personNumber\": \"REDACTED\", \"fullName\": \"REDACTED\", \"displayName\": \"REDACTED\"}, {\"personId\": 1002, \"personNumber\": \"REDACTED\", \"fullName\": \"REDACTED\", \"displayName\": \"REDACTED\"}, {\"personId\": 1003, \"personNumber\": \"REDACTED\", \"fullName\": \"REDACTED\", \"displayName\": \"REDACTED\"}]}}"
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json;charset=utf-8"
+          ]
+        },
+        "status": {
+          "code": 200,
+          "message": "OK"
+        }
+      }
+    },
+    {
+      "request": {
+        "body": "{\"where\": {\"employees\": {\"employees\": [{\"id\": 756}, {\"id\": 1002}, {\"id\": 1003}], \"startDate\": \"2026-04-21\", \"endDate\": \"2026-07-20\"}}}",
+        "headers": {
+          "Accept": [
+            "application/json"
+          ],
+          "Content-Length": [
+            "134"
+          ],
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "method": "POST",
+        "uri": "https://acme.prd.mykronos.com/api/v1/scheduling/employee_swap/multi_read"
+      },
+      "response": {
+        "body": {
+          "string": "[]"
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json;charset=utf-8"
+          ]
+        },
+        "status": {
+          "code": 200,
+          "message": "OK"
+        }
+      }
+    }
+  ],
+  "version": 1
+}
