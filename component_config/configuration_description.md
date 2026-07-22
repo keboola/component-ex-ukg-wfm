@@ -20,7 +20,7 @@ Use the **Test Connection** button to mint a token and verify credentials.
 | `until` | Optional upper bound of the fetch window (ISO 8601 or a relative phrase). Empty = up to the current run time; set it to bound a backfill to a fixed window. |
 | `hyperfind_ref` | Hyperfind query id/name resolving the employee-ID set. Empty = tenant `All Home` default (employee-scoped resources only). |
 | `select` | Optional list of API `select` elements; empty uses the resource default. |
-| `symbolic_period` | Optional UKG-named relative period (e.g. `Current Pay Period`) supplied instead of an explicit start/end date; applies to date-windowed resources only. |
-| `primary_key` | Incremental load only. Column(s) that uniquely identify a row, used to upsert. Overrides the resource registry default and enables incremental upsert even for a registry-keyless resource. Empty uses the resource default. |
+| `symbolic_period` | Optional UKG-named relative period (e.g. `Current Pay Period`) supplied instead of an explicit start/end date; applies to date-windowed resources only. If set it takes precedence and Start/End Date are ignored — use one or the other, not both. |
+| `primary_key` | Incremental load only. Column(s) that uniquely identify a row, used to upsert. Picked from the resource's output-table columns in Storage (a `list_columns` sync action, so it is populated only after the first run has created the table). Overrides the resource registry default and enables incremental upsert even for a registry-keyless resource. Empty uses the resource default. |
 | `max_wait_seconds` | Payroll export only: maximum polling time before failing (default 1800). |
 | `poll_interval_seconds` | Payroll export only: seconds between status polls (default 15). |

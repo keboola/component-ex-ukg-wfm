@@ -82,7 +82,12 @@ Incremental & windowing
 - **Incremental requires a primary key.** A resource upserts incrementally only when a primary key
   exists — either its registry default or one supplied via the row's `primary_key` field. A
   registry-keyless resource with no user-supplied `primary_key` always runs full-replace
-  (incremental-without-PK would append unboundedly).
+  (incremental-without-PK would append unboundedly). The `primary_key` UI field is a Storage-backed
+  column picker: the `list_columns` sync action reads the resource's output table from Storage, so it
+  is populated only after the first run has created that table (requires the component's
+  `forwardToken` flag, set once in the Developer Portal by an admin).
+- A **symbolic period** replaces the date window entirely — when set, Start Date / End Date are
+  ignored, so configure one or the other, not both.
 
 Payroll async export
 ====================

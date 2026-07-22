@@ -8,6 +8,7 @@ from typing import Any
 from keboola.component.base import ComponentBase, sync_action
 from keboola.component.dao import BaseType, ColumnDefinition, SupportedDataTypes
 from keboola.component.exceptions import UserException
+from keboola.component.sync_actions import SelectElement
 
 from client.orchestration import iter_records
 from client.payroll import run_async_export
@@ -18,6 +19,7 @@ from client.resources import (
     effective_primary_key,
     get_resource,
 )
+from client.storage import default_output_table_id, get_table_columns
 from client.transform import flatten_record
 from client.wfm_client import WfmClient
 from client.window import STATE_LAST_RUN, resolve_window
@@ -272,6 +274,37 @@ class Component(ComponentBase):
     def test_connection(self) -> dict[str, str]:
         self.client.get_token()
         return {"status": "success"}
+
+    @sync_action("list_columns")
+    def list_columns(self) -> list[SelectElement]:
+        """Populate the Primary Key dropdown from the resource's output-table columns in Storage.
+
+        The output table exists only after the first extraction run (see the field help), so this
+        button is meant to be pressed once a table has been produced. Reading Storage needs the
+        Storage token forwarded to the component (forwardToken) — surfaced as environment_variables.
+        """
+        if not self._config.resource:
+            raise UserException("Select a resource first, then re-load columns.")
+        env = self.environment_variables
+        if not env.token or not env.url:
+            raise UserException(
+                "Storage token is not available. Enable token forwarding for this component so the "
+                "column picker can read the output table."
+            )
+        if not env.component_id or not env.config_id:
+            raise UserException("Component/configuration id is unavailable; cannot locate the output table.")
+        resource = get_resource(self._config.resource)
+        table_id = default_output_table_id(env.component_id, env.config_id, resource.name)
+        try:
+            columns = get_table_columns(env.url, env.token, table_id)
+        except Exception as exc:
+            raise UserException(f"Failed to read columns for table '{table_id}': {exc}") from exc
+        if columns is None:
+            raise UserException(
+                f"Output table '{table_id}' does not exist yet. Run this extraction once to create it, "
+                "then re-load the columns."
+            )
+        return [SelectElement(value=col, label=col) for col in columns]
 
 
 if __name__ == "__main__":

@@ -37,7 +37,8 @@ class Configuration(BaseModel):
     # Tenant-defined SQL-like query for the async payroll export (payroll_export resource only).
     payroll_query: str | None = None
     # Sampling knobs (advanced/testing): override the apply_read page size and cap the number of
-    # pages fetched. Both default None so production behaviour is unaffected.
+    # pages fetched. Deliberately NOT exposed in the config UI (they looked out of place); set them
+    # via raw config JSON if a run needs to be bounded. Both default None so production is unaffected.
     page_size: int | None = Field(default=None, ge=1)
     max_pages: int | None = Field(default=None, ge=1)
 
