@@ -76,7 +76,10 @@ def resolve_window(
     is_effective_incremental: bool,
     until: str | None = None,
 ) -> tuple[str | None, str | None, str]:
-    """Return (since_iso, until_iso, run_started_iso) for a resource with a date field.
+    """Return (since_iso, until_iso, watermark_iso) for a resource with a date field.
+
+    The third element is the window's upper bound (the configured `until` when set, else the run
+    start) — i.e. the value to persist as the next run's watermark, NOT the run-start timestamp.
 
     When the run is *effectively* incremental (PK present + incremental_load) the state
     watermark is read and used as the lower bound → [last_run, now].
@@ -86,8 +89,8 @@ def resolve_window(
     This is a full refresh each run: no window shrink, no data loss.
     """
     window_state = state if is_effective_incremental else {}
-    params, run_started = compute_window(window_state, date_field, since, until)
-    return params.get(f"{date_field}_since"), params.get(f"{date_field}_until"), run_started
+    params, watermark_iso = compute_window(window_state, date_field, since, until)
+    return params.get(f"{date_field}_since"), params.get(f"{date_field}_until"), watermark_iso
 
 
 def split_date_windows(

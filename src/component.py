@@ -152,14 +152,14 @@ class Component(ComponentBase):
             raise UserException("'resource' is required. Configure a resource row.")
         resource = get_resource(self._config.resource)
         state = self.get_state_file() or {}
-        since_iso, until_iso, run_started = self._compute_window(resource, state)
+        since_iso, until_iso, watermark = self._compute_window(resource, state)
         record_iter = self._record_source(resource, since_iso, until_iso)
         row_count, columns = self._stream_and_write_table(resource, record_iter)
         if row_count == 0:
             logging.info("No rows returned for resource '%s'; skipping table write.", resource.name)
         if self._effective_incremental(resource):
             # Advance watermark even on empty result to prevent unbounded window growth.
-            self.write_state_file({STATE_LAST_RUN: run_started})
+            self.write_state_file({STATE_LAST_RUN: watermark})
         if row_count:
             logging.info("Extracted resource '%s': %s rows, %s columns.", resource.name, row_count, len(columns))
 
@@ -168,7 +168,7 @@ class Component(ComponentBase):
         return effective_incremental(resource, self._config.incremental, self._config.primary_key)
 
     def _compute_window(self, resource: ResourceDef, state: dict[str, Any]) -> tuple[str | None, str | None, str]:
-        """Return (since_iso, until_iso, run_started_iso)."""
+        """Return (since_iso, until_iso, watermark_iso) — the third value is the next-run watermark."""
         # A symbolic period replaces the date window; skip window and watermark logic.
         if self._config.symbolic_period:
             return None, None, datetime.now(UTC).isoformat()
