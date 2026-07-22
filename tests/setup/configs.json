@@ -80,7 +80,7 @@
         "resource": "timekeeping_punches",
         "hyperfind_ref": "253",
         "load_type": "incremental_load",
-        "since": "2026-07-19T00:00:00+00:00"
+        "since": "2026-07-22T10:00:00+00:00"
       }
     }
   },

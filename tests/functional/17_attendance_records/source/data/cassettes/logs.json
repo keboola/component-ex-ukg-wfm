@@ -6,19 +6,19 @@
       "level": "INFO",
       "logger": "root",
       "message": "Loading state file..",
-      "timestamp": "2026-07-20T12:00:00.000Z"
+      "timestamp": "2026-07-22T12:00:00.000Z"
     },
     {
       "level": "INFO",
       "logger": "root",
       "message": "Obtained UKG WFM OAuth token (expires in 1799s).",
-      "timestamp": "2026-07-20T12:00:00.000Z"
+      "timestamp": "2026-07-22T12:00:00.000Z"
     },
     {
       "level": "INFO",
       "logger": "root",
       "message": "No rows returned for resource 'attendance_records'; skipping table write.",
-      "timestamp": "2026-07-20T12:00:00.000Z"
+      "timestamp": "2026-07-22T12:00:00.000Z"
     }
   ]
 }

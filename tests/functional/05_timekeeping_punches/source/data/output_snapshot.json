@@ -1,6 +1,24 @@
 {
   "files": {},
   "hash_algorithm": "sha256",
-  "tables": {},
+  "tables": {
+    "timekeeping_punches.csv": {
+      "columns": [
+        "employee_id",
+        "employee_name",
+        "employee_qualifier",
+        "punches"
+      ],
+      "hash": "sha256:22ae5ee5411e6ac97722e020c57becf7579cb610e40dd5f14e16c25dc0b66950",
+      "row_count": 3,
+      "size_bytes": 3557
+    },
+    "timekeeping_punches.csv.manifest": {
+      "columns": null,
+      "hash": "sha256:6c3b23af04ec48ec002661af50c3353868d3d4d29cc076a99fa47aa840e464d6",
+      "row_count": null,
+      "size_bytes": 764
+    }
+  },
   "version": "1.0"
 }

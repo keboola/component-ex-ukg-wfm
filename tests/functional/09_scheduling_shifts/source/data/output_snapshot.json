@@ -26,9 +26,9 @@
         "startDateTime",
         "version"
       ],
-      "hash": "sha256:198bdd58ba59a6719e6f6b64865f62ed71642d4e0e5c9fedd761afe318fe245a",
-      "row_count": 13,
-      "size_bytes": 23435
+      "hash": "sha256:05f5ed275ca40707bf735cca5d8973eb62a90aa95b4c378cc942f1643a2e2d52",
+      "row_count": 9,
+      "size_bytes": 13395
     },
     "scheduling_shifts.csv.manifest": {
       "columns": null,

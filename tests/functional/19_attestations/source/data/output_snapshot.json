@@ -6,9 +6,9 @@
       "columns": [
         "attestationDailyDetail"
       ],
-      "hash": "sha256:336ef5c686914147b051b920145553f76f88e3beb6e2ab9ebc8aa2f7b55c82b1",
+      "hash": "sha256:b61bd840ef0561200e152223bac57d22abe2f16ff7383937730b903ed22c6c98",
       "row_count": 2,
-      "size_bytes": 69124
+      "size_bytes": 77006
     },
     "attestations.csv.manifest": {
       "columns": null,

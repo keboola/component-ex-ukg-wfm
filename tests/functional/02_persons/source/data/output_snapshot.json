@@ -17,9 +17,9 @@
     },
     "persons.csv.manifest": {
       "columns": null,
-      "hash": "sha256:bcbccd85131e135180f4834765a028ccfb431a91b1db4b8e8ef9a233deaa8789",
+      "hash": "sha256:8904d3314406a2d803e9b3b1c5a98a81b9a4811e72ff516fcf3290f43a1fc321",
       "row_count": null,
-      "size_bytes": 1090
+      "size_bytes": 1066
     }
   },
   "version": "1.0"

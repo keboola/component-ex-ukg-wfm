@@ -15,9 +15,9 @@
     },
     "accruals_transactions.csv.manifest": {
       "columns": null,
-      "hash": "sha256:a25e2bcd052aa5c9be9097b65162857a0221ebdd1b7a5d99a39dfdb0e3c75734",
+      "hash": "sha256:c927291594527494951dbcf2405de649a67a4b6c95e925d9c859f5d3e428f6a1",
       "row_count": null,
-      "size_bytes": 808
+      "size_bytes": 784
     }
   },
   "version": "1.0"

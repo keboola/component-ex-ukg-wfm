@@ -34,15 +34,15 @@
         "workHolidayCredits",
         "workedShifts"
       ],
-      "hash": "sha256:9902ec2044d99159ba4d30d788a6dda084b106bc80b19e96d0fd4eb6191a7021",
+      "hash": "sha256:923d1146d8faa85e914df48f91ddc442f340b7d2e4fb163625fc4d0e352f9188",
       "row_count": 4,
-      "size_bytes": 326035
+      "size_bytes": 266843
     },
     "timekeeping_timecards.csv.manifest": {
       "columns": null,
-      "hash": "sha256:1eba54eee848afaf8d4f36dc904abb7e40cb2a32830837c4db931224de439700",
+      "hash": "sha256:ba5f12f977c68650141cb50ac6cd20c0159ace9d02e99b125d7d6bfad2960936",
       "row_count": null,
-      "size_bytes": 4644
+      "size_bytes": 4596
     }
   },
   "version": "1.0"

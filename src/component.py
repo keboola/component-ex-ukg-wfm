@@ -107,6 +107,9 @@ try:
                 "path",
                 "parentPath",
                 "orgPath",
+                # persistentId carries human-readable facility/department labels (e.g. Hyperfind
+                # query keys) that identify the tenant's sites — treat as identifying, not a bare id.
+                "persistentId",
                 "scope",
                 "question",
                 "shortQuestion",
@@ -339,8 +342,11 @@ if __name__ == "__main__":
         comp = Component()
         comp.execute_action()
     except UserException as exc:
-        logging.exception(exc)
+        # User-actionable error (bad config, API 4xx, unknown resource): log the message only.
+        # A full traceback here is noise for the user and would leak local source paths — reserve
+        # tracebacks for genuinely unexpected failures below (exit 2).
+        logging.error(exc)
         exit(1)
-    except Exception as exc:
-        logging.exception(exc)
+    except Exception:
+        logging.exception("Unexpected error")
         exit(2)
