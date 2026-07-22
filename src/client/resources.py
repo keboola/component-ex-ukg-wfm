@@ -521,9 +521,7 @@ def effective_primary_key(resource: ResourceDef, config_pk: list[str] | None = N
     return config_pk or resource.primary_key
 
 
-def effective_incremental(
-    resource: ResourceDef, incremental_load: bool, config_pk: list[str] | None = None
-) -> bool:
+def effective_incremental(resource: ResourceDef, incremental_load: bool, config_pk: list[str] | None = None) -> bool:
     """Single source of truth for whether a run is *effectively* incremental.
 
     A run behaves incrementally (append/upsert with PK dedup, a state watermark, and

@@ -150,8 +150,16 @@ def _read_chunk_with_shrink(
             # Re-run the sub-chunks at the smaller size.
             for sub in _initial_chunks(chunk, size):
                 yield from _read_chunk_with_shrink(
-                    client, resource, sub, since_iso, until_iso, select, symbolic_period, hyperfind_ref,
-                    page_size, max_pages,
+                    client,
+                    resource,
+                    sub,
+                    since_iso,
+                    until_iso,
+                    select,
+                    symbolic_period,
+                    hyperfind_ref,
+                    page_size,
+                    max_pages,
                 )
             return
 
@@ -349,9 +357,7 @@ def iter_records(
         # Server-side scoping (Information Access) needs a Hyperfind reference; without one the
         # only fallback ("All Home") exceeds the tenant threshold. Fail closed rather than
         # issuing an unbounded query.
-        raise UserException(
-            f"Resource '{resource.name}' requires a hyperfind_ref (server-side Hyperfind scoping)."
-        )
+        raise UserException(f"Resource '{resource.name}' requires a hyperfind_ref (server-side Hyperfind scoping).")
 
     # A symbolic period (e.g. "Current Pay Period") replaces the date window entirely; the
     # caller has already skipped window/watermark logic, so read once with the symbolic bound.
@@ -372,11 +378,27 @@ def iter_records(
         # Sub-hour granularity for endpoints with a per-call window cap (punches <= 60 min).
         for w_start, w_end in split_date_windows(start, end, max_minutes=resource.window_max_minutes):
             yield from chunk_and_read(
-                client, resource, emp_ids, w_start.isoformat(), w_end.isoformat(), select, None, hyperfind_ref,
-                page_size, max_pages,
+                client,
+                resource,
+                emp_ids,
+                w_start.isoformat(),
+                w_end.isoformat(),
+                select,
+                None,
+                hyperfind_ref,
+                page_size,
+                max_pages,
             )
     else:
         yield from chunk_and_read(
-            client, resource, emp_ids, since_iso or "", until_iso or "", select, None, hyperfind_ref,
-            page_size, max_pages,
+            client,
+            resource,
+            emp_ids,
+            since_iso or "",
+            until_iso or "",
+            select,
+            None,
+            hyperfind_ref,
+            page_size,
+            max_pages,
         )

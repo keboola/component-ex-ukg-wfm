@@ -41,9 +41,7 @@ def run_async_export(
       3. fetch   GET  /commons/payroll/export/async/{executionKey}/response  -> CSV
     """
     if not query:
-        raise UserException(
-            "Resource 'payroll_export' requires a tenant-defined query. Set config 'payroll_query'."
-        )
+        raise UserException("Resource 'payroll_export' requires a tenant-defined query. Set config 'payroll_query'.")
     submit_body: dict[str, Any] = dict(resource.body_template)
     submit_body["query"] = query
     submit_body["requestId"] = f"kbc-{uuid.uuid4().hex}"
@@ -95,9 +93,7 @@ def _poll_until_terminal(
         waited += poll_interval_s
 
 
-def _download_and_parse_csv(
-    client: WfmClient, download_url: str, execution_key: str
-) -> Iterator[dict[str, Any]]:
+def _download_and_parse_csv(client: WfmClient, download_url: str, execution_key: str) -> Iterator[dict[str, Any]]:
     """Stream the CSV export body to a /tmp scratch file, then parse and yield rows as dicts.
 
     The raw HTTP body is streamed to disk in chunks (never buffered whole in RAM); the scratch file

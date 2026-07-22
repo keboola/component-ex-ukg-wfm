@@ -43,9 +43,7 @@ def test_compute_window_first_run_uses_since():
 def test_compute_window_end_date_bounds_upper_and_watermark():
     # An explicit End Date (`until`) sets the upper bound AND becomes the persisted watermark,
     # so the next run continues from there rather than from "now".
-    params, watermark = compute_window(
-        {}, "start", "2026-01-01T00:00:00+00:00", until="2026-02-01T00:00:00+00:00"
-    )
+    params, watermark = compute_window({}, "start", "2026-01-01T00:00:00+00:00", until="2026-02-01T00:00:00+00:00")
     assert params["start_since"] == "2026-01-01T00:00:00+00:00"
     assert params["start_until"] == "2026-02-01T00:00:00+00:00"
     assert watermark == "2026-02-01T00:00:00+00:00"

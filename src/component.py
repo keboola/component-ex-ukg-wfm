@@ -68,27 +68,52 @@ try:
             return response
         try:
             data = _json.loads(text)
-        except (_json.JSONDecodeError, TypeError, ValueError):
+        except _json.JSONDecodeError, TypeError, ValueError:
             return response
         capped = _json.dumps(_truncate_json_arrays(data))
         body["string"] = capped.encode("utf-8") if is_bytes else capped
         return response
 
     VCR_SANITIZERS = [
-        DefaultSanitizer(additional_sensitive_fields=[
-            # Credential / person identity (already vetted).
-            "username", "firstName", "lastName", "fullName", "displayName",
-            "updateByPersonFullName", "personNumber",
-            # Identifying names and free-text fields across WFM resources.
-            "name", "qualifier", "shortName", "typeName", "description",
-            "functionalAreaName", "parentName", "holidayDisplayName",
-            "dataSourceDisplayName", "label", "trackingLabel",
-            "laborCategoryEntryDescription", "commentNotes", "commentsNotes",
-            "comments", "comment", "notes",
-            # Org-path / hierarchy locators and free-text question/answer/message fields.
-            "path", "parentPath", "orgPath", "scope",
-            "question", "shortQuestion", "answer", "message",
-        ]),
+        DefaultSanitizer(
+            additional_sensitive_fields=[
+                # Credential / person identity (already vetted).
+                "username",
+                "firstName",
+                "lastName",
+                "fullName",
+                "displayName",
+                "updateByPersonFullName",
+                "personNumber",
+                # Identifying names and free-text fields across WFM resources.
+                "name",
+                "qualifier",
+                "shortName",
+                "typeName",
+                "description",
+                "functionalAreaName",
+                "parentName",
+                "holidayDisplayName",
+                "dataSourceDisplayName",
+                "label",
+                "trackingLabel",
+                "laborCategoryEntryDescription",
+                "commentNotes",
+                "commentsNotes",
+                "comments",
+                "comment",
+                "notes",
+                # Org-path / hierarchy locators and free-text question/answer/message fields.
+                "path",
+                "parentPath",
+                "orgPath",
+                "scope",
+                "question",
+                "shortQuestion",
+                "answer",
+                "message",
+            ]
+        ),
         UrlPatternSanitizer(patterns=[(r"[a-z0-9-]+\.prd\.mykronos\.com", "acme.prd.mykronos.com")]),
         CallbackSanitizer(before_response=_cap_response_records),
     ]
@@ -301,8 +326,10 @@ class Component(ComponentBase):
             raise UserException(f"Failed to read columns for table '{table_id}': {exc}") from exc
         if columns is None:
             raise UserException(
-                f"Output table '{table_id}' does not exist yet. Run this extraction once to create it, "
-                "then re-load the columns."
+                f"No output table found at '{table_id}'. If you have not run this extraction yet, run it "
+                "once to create the table, then re-load the columns. The picker resolves the config's "
+                "default output bucket, so a dev branch or a custom output-bucket mapping is not supported "
+                "— set the primary key manually in that case."
             )
         return [SelectElement(value=col, label=col) for col in columns]
 

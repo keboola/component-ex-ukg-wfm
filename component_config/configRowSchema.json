@@ -179,7 +179,7 @@
       },
       "options": {
         "async": {
-          "label": "Re-load columns from Storage",
+          "label": "Re-load Columns from Storage",
           "action": "list_columns"
         },
         "dependencies": {
