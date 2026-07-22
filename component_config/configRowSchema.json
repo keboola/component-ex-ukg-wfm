@@ -64,11 +64,12 @@
     "load_type": {
       "type": "string",
       "title": "Load Type",
-      "description": "Full load replaces all data; incremental load appends new records within a moving date window. Resources without a stable primary key always run full-load.",
-      "enum": ["full_load", "incremental_load"],
+      "description": "How rows are written to the table: full load replaces it each run; incremental load upserts by primary key",
       "options": {
-        "enum_titles": ["Full Load", "Incremental Load"]
+        "enum_titles": ["Full Load", "Incremental Load"],
+        "tooltip": "This controls the Storage write mode only, not how much data is fetched — the fetch window is set by Start/End Date. Incremental load upserts by the Primary Key; a resource with no primary key always runs as a full replace."
       },
+      "enum": ["full_load", "incremental_load"],
       "default": "incremental_load",
       "propertyOrder": 20
     },
@@ -80,6 +81,15 @@
         "tooltip": "Bounds the API fetch and is independent of Load Type. For a primary-key resource on incremental load it seeds the first run, after which the stored state watermark takes over. For full load (and any keyless resource) it is applied on every run."
       },
       "propertyOrder": 30
+    },
+    "until": {
+      "type": "string",
+      "title": "End Date",
+      "description": "Upper bound of the fetch window",
+      "options": {
+        "tooltip": "Optional. ISO 8601 (e.g. `2026-02-01T00:00:00+00:00`) or a relative phrase (e.g. `yesterday`, `now`). Leave empty to fetch up to the current run time; set it to bound a backfill to a fixed window."
+      },
+      "propertyOrder": 40
     },
     "hyperfind_ref": {
       "type": "string",

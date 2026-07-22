@@ -38,3 +38,22 @@ def test_compute_window_first_run_uses_since():
     assert params["start_since"] == "2026-01-01T00:00:00+00:00"
     assert "start_until" in params
     assert run_started
+
+
+def test_compute_window_end_date_bounds_upper_and_watermark():
+    # An explicit End Date (`until`) sets the upper bound AND becomes the persisted watermark,
+    # so the next run continues from there rather than from "now".
+    params, watermark = compute_window(
+        {}, "start", "2026-01-01T00:00:00+00:00", until="2026-02-01T00:00:00+00:00"
+    )
+    assert params["start_since"] == "2026-01-01T00:00:00+00:00"
+    assert params["start_until"] == "2026-02-01T00:00:00+00:00"
+    assert watermark == "2026-02-01T00:00:00+00:00"
+
+
+def test_compute_window_no_end_date_defaults_upper_to_now():
+    before = datetime.now(UTC)
+    params, watermark = compute_window({}, "start", None)
+    upper = datetime.fromisoformat(params["start_until"])
+    assert upper >= before  # upper bound is the run start (now)
+    assert watermark == params["start_until"]

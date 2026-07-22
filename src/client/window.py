@@ -39,10 +39,18 @@ def parse_since(value: str) -> datetime:
     return parsed
 
 
-def compute_window(state: dict[str, Any], date_field: str, since: str | None) -> tuple[dict[str, Any], str]:
-    """Return (query-params, run_started_iso). Capture run-start BEFORE fetch; persist AFTER write."""
+def compute_window(
+    state: dict[str, Any], date_field: str, since: str | None, until: str | None = None
+) -> tuple[dict[str, Any], str]:
+    """Return (query-params, watermark_iso). Capture run-start BEFORE fetch; persist AFTER write.
+
+    The upper bound is the configured `until` (End Date, ISO or relative phrase) when set, else the
+    run start (now). The returned watermark is that same upper bound, so the next run continues from
+    where this one stopped.
+    """
     run_started = datetime.now(UTC)
-    params: dict = {f"{date_field}_until": run_started.isoformat()}
+    upper = parse_since(until) if until else run_started
+    params: dict = {f"{date_field}_until": upper.isoformat()}
 
     watermark = state.get(STATE_LAST_RUN)
     lower_str = watermark or since
@@ -58,7 +66,7 @@ def compute_window(state: dict[str, Any], date_field: str, since: str | None) ->
             # In this branch watermark is falsy, so lower_str == since and is a non-empty str.
             lower = parse_since(lower_str)
         params[f"{date_field}_since"] = lower.isoformat()
-    return params, run_started.isoformat()
+    return params, upper.isoformat()
 
 
 def resolve_window(
@@ -66,6 +74,7 @@ def resolve_window(
     date_field: str,
     since: str | None,
     is_effective_incremental: bool,
+    until: str | None = None,
 ) -> tuple[str | None, str | None, str]:
     """Return (since_iso, until_iso, run_started_iso) for a resource with a date field.
 
@@ -77,7 +86,7 @@ def resolve_window(
     This is a full refresh each run: no window shrink, no data loss.
     """
     window_state = state if is_effective_incremental else {}
-    params, run_started = compute_window(window_state, date_field, since)
+    params, run_started = compute_window(window_state, date_field, since, until)
     return params.get(f"{date_field}_since"), params.get(f"{date_field}_until"), run_started
 
 

@@ -24,6 +24,8 @@ class Configuration(BaseModel):
     resource: str | None = None
     load_type: LoadType = LoadType.INCREMENTAL
     since: str | None = None
+    # Optional upper bound of the fetch window; empty = now (run start).
+    until: str | None = None
     symbolic_period: str | None = None
     hyperfind_ref: str | None = None
     select: list[str] = Field(default_factory=list)

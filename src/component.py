@@ -153,6 +153,7 @@ class Component(ComponentBase):
             date_field,
             self._config.since,
             self._effective_incremental(resource),
+            self._config.until,
         )
 
     def _record_source(

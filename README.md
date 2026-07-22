@@ -69,6 +69,8 @@ Incremental & windowing
 - **Start Date (`since`)** bounds the API fetch and is independent of the load type. It seeds the
   first run of a primary-key resource on incremental load (state watermark takes over afterwards),
   and is applied on every run for full load and for keyless resources.
+- **End Date (`until`)** optionally bounds the upper end of the fetch window (empty = the current
+  run time); when set it also becomes the persisted watermark so the next run continues from there.
 - The window is split into **≤365-day sub-windows** to respect service limits; employee sets are
   chunked by each resource's per-call batch limit (≤500 for most, 100 for persons, 50 for activity
   net-changes) and adaptively **halved on HTTP 413**.

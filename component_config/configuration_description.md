@@ -17,6 +17,7 @@ Use the **Test Connection** button to mint a token and verify credentials.
 | `resource` | The WFM resource to extract (see the resource dropdown / README table). |
 | `load_type` | `full_load` or `incremental_load`. Resources without a stable primary key always run full-load. |
 | `since` | Lower bound of the API fetch window (ISO 8601 or a relative phrase like `30 days ago`). Independent of load type: for a primary-key resource on incremental load it seeds the first run, after which the state watermark takes over; for full load (and any keyless resource) it is applied on every run. |
+| `until` | Optional upper bound of the fetch window (ISO 8601 or a relative phrase). Empty = up to the current run time; set it to bound a backfill to a fixed window. |
 | `hyperfind_ref` | Hyperfind query id/name resolving the employee-ID set. Empty = tenant `All Home` default (employee-scoped resources only). |
 | `select` | Optional list of API `select` elements; empty uses the resource default. |
 | `symbolic_period` | Optional UKG-named relative period (e.g. `Current Pay Period`) supplied instead of an explicit start/end date; applies to date-windowed resources only. |
