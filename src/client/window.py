@@ -25,10 +25,12 @@ def parse_since(value: str) -> datetime:
     except ValueError:
         parsed = None
     if parsed is not None:
-        # fromisoformat returns a naive datetime for offset-less input (e.g. "2026-01-01T00:00:00");
-        # assume UTC so it stays comparable with the timezone-aware run-start (else a naive/aware
-        # comparison raises TypeError downstream in split_date_windows).
-        return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
+        # Normalize to UTC to honor the return contract. fromisoformat returns a naive datetime for
+        # offset-less input (e.g. "2026-01-01T00:00:00") — assume UTC; an explicit non-UTC offset
+        # (e.g. "...+02:00") is converted to UTC — the same instant, but one canonical representation
+        # in request params and persisted watermarks, and comparable with the timezone-aware
+        # run-start (a naive/aware comparison would raise TypeError downstream in split_date_windows).
+        return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed.astimezone(UTC)
 
     parsed = dateparser.parse(value, settings=_DATEPARSER_SETTINGS)
     if parsed is None:
@@ -36,7 +38,8 @@ def parse_since(value: str) -> datetime:
             f"Cannot parse '{value}' as a date — use ISO 8601 (e.g. '2026-01-01T00:00:00+00:00') "
             "or a relative phrase (e.g. 'yesterday', '3 days ago', 'now')."
         )
-    return parsed
+    # dateparser already returns UTC-aware (TIMEZONE=UTC), but normalize for a single guaranteed contract.
+    return parsed.astimezone(UTC)
 
 
 def compute_window(

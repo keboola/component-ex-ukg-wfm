@@ -15,6 +15,14 @@ def test_parse_since_keeps_explicit_offset():
     assert parse_since("2026-01-01T00:00:00+00:00").utcoffset() == timedelta(0)
 
 
+def test_parse_since_converts_nonutc_offset_to_utc():
+    # A non-UTC offset must be converted to UTC (same instant), not passed through — so request
+    # params and persisted watermarks use one canonical representation.
+    result = parse_since("2026-01-01T00:00:00+02:00")
+    assert result.utcoffset() == timedelta(0)
+    assert result == datetime(2025, 12, 31, 22, 0, tzinfo=UTC)
+
+
 def test_split_under_max_returns_single_window():
     start = datetime(2026, 1, 1, tzinfo=UTC)
     end = datetime(2026, 3, 1, tzinfo=UTC)
