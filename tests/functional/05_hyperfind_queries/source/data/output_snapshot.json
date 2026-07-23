@@ -1,0 +1,28 @@
+{
+  "files": {},
+  "hash_algorithm": "sha256",
+  "tables": {
+    "hyperfind_queries.csv": {
+      "columns": [
+        "description",
+        "id",
+        "inclusiveExclusivefilterType",
+        "name",
+        "persistentId",
+        "usageType",
+        "visibility_id",
+        "visibility_name"
+      ],
+      "hash": "sha256:8d2a9bf2125510d4bc555987997c760a80082fcac2902df0df423cf9dd0a72ba",
+      "row_count": 26,
+      "size_bytes": 1415
+    },
+    "hyperfind_queries.csv.manifest": {
+      "columns": null,
+      "hash": "sha256:541e27a86d428645ea054e714b460256c5275bb208b716f8340569032487eb4f",
+      "row_count": null,
+      "size_bytes": 1368
+    }
+  },
+  "version": "1.0"
+}

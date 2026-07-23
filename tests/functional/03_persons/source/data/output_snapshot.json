@@ -1,0 +1,26 @@
+{
+  "files": {},
+  "hash_algorithm": "sha256",
+  "tables": {
+    "persons.csv": {
+      "columns": [
+        "employmentStatus",
+        "firstName",
+        "lastName",
+        "personId",
+        "personNumber",
+        "userAccountStatus"
+      ],
+      "hash": "sha256:787c632addaca277aef465fcea7a42c3cbeaf0c9798a9d636c51eb817a9fb68c",
+      "row_count": 51,
+      "size_bytes": 2361
+    },
+    "persons.csv.manifest": {
+      "columns": null,
+      "hash": "sha256:8904d3314406a2d803e9b3b1c5a98a81b9a4811e72ff516fcf3290f43a1fc321",
+      "row_count": null,
+      "size_bytes": 1066
+    }
+  },
+  "version": "1.0"
+}

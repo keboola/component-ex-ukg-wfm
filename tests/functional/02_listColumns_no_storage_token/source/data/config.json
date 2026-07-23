@@ -1,0 +1,11 @@
+{
+  "action": "list_columns",
+  "parameters": {
+    "host": "https://acme.prd.mykronos.com",
+    "client_id": "DUMMY_CLIENT_ID",
+    "#client_secret": "DUMMY_CLIENT_SECRET",
+    "username": "DUMMY_USER",
+    "#password": "DUMMY_PASSWORD",
+    "resource": "persons"
+  }
+}

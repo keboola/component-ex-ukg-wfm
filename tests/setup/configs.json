@@ -1,7 +1,7 @@
 [
   {
     "name": "01_testConnection",
-    "description": "Test API connection with valid credentials",
+    "description": "Sync action testConnection: authenticate against the tenant → {\"status\": \"success\"}",
     "config": {
       "action": "testConnection",
       "parameters": {
@@ -14,8 +14,23 @@
     }
   },
   {
-    "name": "02_persons",
-    "description": "Download resource 'persons' (full load)",
+    "name": "02_listColumns_no_storage_token",
+    "description": "Sync action list_columns without a forwarded Storage token → UserException, exit code 1",
+    "config": {
+      "action": "list_columns",
+      "parameters": {
+        "host": "https://acme.prd.mykronos.com",
+        "client_id": "DUMMY_CLIENT_ID",
+        "#client_secret": "DUMMY_CLIENT_SECRET",
+        "username": "DUMMY_USER",
+        "#password": "DUMMY_PASSWORD",
+        "resource": "persons"
+      }
+    }
+  },
+  {
+    "name": "03_persons",
+    "description": "Extract 'persons' (full load, apply_read paging) — returns rows",
     "config": {
       "action": "run",
       "parameters": {
@@ -33,8 +48,8 @@
     }
   },
   {
-    "name": "03_business_structure",
-    "description": "Download resource 'business_structure' (full load)",
+    "name": "04_business_structure",
+    "description": "Extract 'business_structure' (full load, org-map query) — returns rows",
     "config": {
       "action": "run",
       "parameters": {
@@ -50,8 +65,8 @@
     }
   },
   {
-    "name": "04_hyperfind_queries",
-    "description": "Download resource 'hyperfind_queries' (full load)",
+    "name": "05_hyperfind_queries",
+    "description": "Extract 'hyperfind_queries' (full load, GET list) — returns rows",
     "config": {
       "action": "run",
       "parameters": {
@@ -67,8 +82,8 @@
     }
   },
   {
-    "name": "05_timekeeping_punches",
-    "description": "Download resource 'timekeeping_punches' (windowed)",
+    "name": "06_timekeeping_punches_empty",
+    "description": "Extract 'timekeeping_punches' (windowed, apply_read) — 200 but no punches in window → 0 rows, no table",
     "config": {
       "action": "run",
       "parameters": {
@@ -85,8 +100,8 @@
     }
   },
   {
-    "name": "06_timekeeping_timecards",
-    "description": "Download resource 'timekeeping_timecards' (windowed)",
+    "name": "07_timekeeping_timecards",
+    "description": "Extract 'timekeeping_timecards' (windowed) — returns rows",
     "config": {
       "action": "run",
       "parameters": {
@@ -103,8 +118,8 @@
     }
   },
   {
-    "name": "07_timekeeping_timecard_metrics",
-    "description": "Download resource 'timekeeping_timecard_metrics' (windowed)",
+    "name": "08_timekeeping_timecard_metrics",
+    "description": "Extract 'timekeeping_timecard_metrics' (windowed) — returns rows",
     "config": {
       "action": "run",
       "parameters": {
@@ -121,8 +136,8 @@
     }
   },
   {
-    "name": "08_scheduling_schedules",
-    "description": "Download resource 'scheduling_schedules' (windowed)",
+    "name": "09_scheduling_schedules",
+    "description": "Extract 'scheduling_schedules' (windowed, scheduleDayList envelope) — returns rows",
     "config": {
       "action": "run",
       "parameters": {
@@ -139,8 +154,8 @@
     }
   },
   {
-    "name": "09_scheduling_shifts",
-    "description": "Download resource 'scheduling_shifts' (windowed)",
+    "name": "10_scheduling_shifts",
+    "description": "Extract 'scheduling_shifts' (windowed, shifts envelope) — returns rows",
     "config": {
       "action": "run",
       "parameters": {
@@ -157,8 +172,8 @@
     }
   },
   {
-    "name": "10_scheduling_open_shifts",
-    "description": "Download resource 'scheduling_open_shifts' (windowed)",
+    "name": "11_scheduling_open_shifts",
+    "description": "Extract 'scheduling_open_shifts' (windowed, openShifts envelope) — returns rows",
     "config": {
       "action": "run",
       "parameters": {
@@ -175,8 +190,8 @@
     }
   },
   {
-    "name": "11_scheduling_swaps",
-    "description": "Download resource 'scheduling_swaps' (windowed)",
+    "name": "12_scheduling_swaps_empty",
+    "description": "Extract 'scheduling_swaps' (windowed) — 200 but no swap requests in window → 0 rows, no table",
     "config": {
       "action": "run",
       "parameters": {
@@ -193,8 +208,8 @@
     }
   },
   {
-    "name": "12_accruals_balances",
-    "description": "Download resource 'accruals_balances' (windowed)",
+    "name": "13_accruals_balances",
+    "description": "Extract 'accruals_balances' (windowed, ACCRUAL_SUMMARY select) — returns rows",
     "config": {
       "action": "run",
       "parameters": {
@@ -211,8 +226,8 @@
     }
   },
   {
-    "name": "13_accruals_transactions",
-    "description": "Download resource 'accruals_transactions' (windowed)",
+    "name": "14_accruals_transactions",
+    "description": "Extract 'accruals_transactions' (windowed, ACCRUAL_TRANSACTIONS select) — returns rows",
     "config": {
       "action": "run",
       "parameters": {
@@ -229,8 +244,8 @@
     }
   },
   {
-    "name": "14_accruals_summaries",
-    "description": "Download resource 'accruals_summaries' (windowed)",
+    "name": "15_accruals_summaries",
+    "description": "Extract 'accruals_summaries' (windowed, ACCRUAL_SUMMARY select) — returns rows",
     "config": {
       "action": "run",
       "parameters": {
@@ -247,8 +262,8 @@
     }
   },
   {
-    "name": "15_leave_cases",
-    "description": "Download resource 'leave_cases' (windowed)",
+    "name": "16_leave_cases_empty",
+    "description": "Extract 'leave_cases' (windowed) — 200 but no leave cases in window → 0 rows, no table",
     "config": {
       "action": "run",
       "parameters": {
@@ -265,8 +280,8 @@
     }
   },
   {
-    "name": "16_leave_edits",
-    "description": "Download resource 'leave_edits' (windowed)",
+    "name": "17_leave_edits_empty",
+    "description": "Extract 'leave_edits' (windowed, leaveEdits envelope) — 200 but no edits in window → 0 rows, no table",
     "config": {
       "action": "run",
       "parameters": {
@@ -283,8 +298,8 @@
     }
   },
   {
-    "name": "17_attendance_records",
-    "description": "Download resource 'attendance_records' (windowed)",
+    "name": "18_attendance_records_empty",
+    "description": "Extract 'attendance_records' (windowed) — 200 but no attendance actions in window → 0 rows, no table",
     "config": {
       "action": "run",
       "parameters": {
@@ -301,8 +316,8 @@
     }
   },
   {
-    "name": "18_attendance_events",
-    "description": "Download resource 'attendance_events' (windowed)",
+    "name": "19_attendance_events_empty",
+    "description": "Extract 'attendance_events' (windowed) — 200 but no attendance events in window → 0 rows, no table",
     "config": {
       "action": "run",
       "parameters": {
@@ -319,8 +334,8 @@
     }
   },
   {
-    "name": "19_attestations",
-    "description": "Download resource 'attestations' (windowed)",
+    "name": "20_attestations",
+    "description": "Extract 'attestations' (windowed, employees-list body) — returns rows",
     "config": {
       "action": "run",
       "parameters": {
@@ -337,8 +352,8 @@
     }
   },
   {
-    "name": "20_work_activities",
-    "description": "Download resource 'work_activities' (full load)",
+    "name": "21_work_activities_not_licensed",
+    "description": "Extract 'work_activities' — Activities Integration API not licensed on tenant (403 WFA-000030) → exit code 1",
     "config": {
       "action": "run",
       "parameters": {
@@ -354,8 +369,8 @@
     }
   },
   {
-    "name": "21_work_activity_shifts",
-    "description": "Download resource 'work_activity_shifts' (windowed)",
+    "name": "22_work_activity_shifts_not_licensed",
+    "description": "Extract 'work_activity_shifts' — Activities Integration API not licensed on tenant (403 WFA-000030) → exit code 1",
     "config": {
       "action": "run",
       "parameters": {
@@ -372,8 +387,8 @@
     }
   },
   {
-    "name": "22_work_activity_net_changes",
-    "description": "Download resource 'work_activity_net_changes' (windowed)",
+    "name": "23_work_activity_net_changes_not_licensed",
+    "description": "Extract 'work_activity_net_changes' — Activities Integration API not licensed on tenant (403 WFA-000030) → exit code 1",
     "config": {
       "action": "run",
       "parameters": {
@@ -390,8 +405,8 @@
     }
   },
   {
-    "name": "23_payroll_export",
-    "description": "Download resource 'payroll_export' (windowed)",
+    "name": "24_payroll_export",
+    "description": "Extract 'payroll_export' (async submit/poll/fetch) — returns rows",
     "config": {
       "action": "run",
       "parameters": {
@@ -409,8 +424,8 @@
     }
   },
   {
-    "name": "24_forecasting",
-    "description": "Download resource 'forecasting' (windowed)",
+    "name": "25_forecasting_no_drivers",
+    "description": "Extract 'forecasting' — no forecast categories/drivers configured on tenant (WFF-270001) → exit code 1",
     "config": {
       "action": "run",
       "parameters": {
@@ -427,8 +442,8 @@
     }
   },
   {
-    "name": "25_invalid_resource",
-    "description": "Unknown resource name \u2192 UserException, exit code 1",
+    "name": "26_invalid_resource",
+    "description": "Unknown resource name → UserException, exit code 1",
     "config": {
       "action": "run",
       "parameters": {
@@ -442,8 +457,8 @@
     }
   },
   {
-    "name": "26_missing_resource",
-    "description": "Run without a resource selected \u2192 UserException, exit code 1",
+    "name": "27_missing_resource",
+    "description": "Run without a resource selected → UserException, exit code 1",
     "config": {
       "action": "run",
       "parameters": {

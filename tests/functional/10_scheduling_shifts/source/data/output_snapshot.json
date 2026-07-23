@@ -1,0 +1,41 @@
+{
+  "files": {},
+  "hash_algorithm": "sha256",
+  "tables": {
+    "scheduling_shifts.csv": {
+      "columns": [
+        "commentNotes",
+        "deleted",
+        "employee_id",
+        "employee_qualifier",
+        "endDateTime",
+        "generated",
+        "id",
+        "label",
+        "locked",
+        "modifiedDateTime",
+        "onCall",
+        "open",
+        "position_id",
+        "position_qualifier",
+        "posted",
+        "postedNotificationPending",
+        "relations",
+        "segments",
+        "selfServiced",
+        "startDateTime",
+        "version"
+      ],
+      "hash": "sha256:f00796b4306f89f1de21e91343963376be5a0f78ed8071ba54e91ba8ca4650dc",
+      "row_count": 10,
+      "size_bytes": 13239
+    },
+    "scheduling_shifts.csv.manifest": {
+      "columns": null,
+      "hash": "sha256:eb7c503df90d1c036b6305ea8401c0ae7610df52b08660c9eb0a5ea621450ec0",
+      "row_count": null,
+      "size_bytes": 3300
+    }
+  },
+  "version": "1.0"
+}

@@ -1,0 +1,26 @@
+{
+  "files": {},
+  "hash_algorithm": "sha256",
+  "tables": {
+    "scheduling_schedules.csv": {
+      "columns": [
+        "day",
+        "employee_id",
+        "employee_qualifier",
+        "hasHoliday",
+        "hasPayCodeEdit",
+        "hasShift"
+      ],
+      "hash": "sha256:f525b1e28248d7da8f1ba1072f0021460f35e44f00e86cf10d2538bf2adb39bf",
+      "row_count": 26,
+      "size_bytes": 1157
+    },
+    "scheduling_schedules.csv.manifest": {
+      "columns": null,
+      "hash": "sha256:ab03713ea97adcc6e393120ef6acfd0d2fb60120cf3b62639f6b7d7fbcd2baf1",
+      "row_count": null,
+      "size_bytes": 1062
+    }
+  },
+  "version": "1.0"
+}

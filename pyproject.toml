@@ -16,13 +16,6 @@ dependencies = [
 dev = [
     "freezegun>=1.5.1",
     "keboola.datadirtest>=2.2.0",
-    # Pin vcrpy: keboola.vcr 0.5.0 monkeypatches VCRHTTPResponse.__init__ with a one-positional-arg
-    # signature matching vcrpy 8.1.x. vcrpy 8.2+ added a second positional (`uri`) to that call, so
-    # the patch raises `TypeError: takes 2 positional args but 3 given` at record/replay. This is a
-    # keboola.vcr-vs-vcrpy version mismatch (NOT a Python 3.14 issue — plain vcrpy 8.3 runs fine on
-    # 3.14). 8.1.1 is within keboola.vcr's own declared range (>=8.1.1,<9). Revisit when keboola.vcr
-    # ships a patch compatible with the newer vcrpy signature.
-    "vcrpy==8.1.1",
     "mock>=5.2.0",
     "pre-commit>=4.5.0",
     "pytest>=9.0.2",

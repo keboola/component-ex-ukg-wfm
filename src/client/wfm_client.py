@@ -2,6 +2,7 @@ import logging
 import time
 from datetime import UTC, datetime, timedelta
 from typing import Any
+from urllib.parse import urlsplit
 
 import backoff
 import requests
@@ -10,6 +11,18 @@ from keboola.component.exceptions import UserException
 _TOKEN_SAFETY_MARGIN_S = 60
 _RETRIABLE_STATUS = frozenset({408, 429})
 _BACKOFF_MIN_WAIT_S = 1.0
+
+
+def _endpoint(url: str) -> str:
+    """Path (+query) of a full URL — a host-agnostic locator for error logs.
+
+    The tenant host differs between a live recording (real host, sanitized to a placeholder in
+    captured logs) and VCR replay (placeholder host), so logging the full URL makes failure-test
+    log comparisons diverge on the host alone. The path identifies the endpoint unambiguously and
+    is identical in both, and the operator already knows their own tenant host.
+    """
+    parts = urlsplit(url)
+    return parts.path + (f"?{parts.query}" if parts.query else "")
 
 
 class PayloadTooLargeError(Exception):
@@ -123,7 +136,7 @@ class WfmClient:
                 self._token_expiry = None
                 resp = self._request_with_retry(method, url, json_body, params)
         except requests.RequestException as e:
-            raise UserException(f"UKG WFM request to {url} failed: {type(e).__name__}") from e
+            raise UserException(f"UKG WFM request to {_endpoint(url)} failed: {type(e).__name__}") from e
         if resp.status_code == 413:
             raise PayloadTooLargeError(url)
         try:
@@ -131,11 +144,11 @@ class WfmClient:
         except requests.HTTPError as e:
             status = e.response.status_code if e.response is not None else "unknown"
             reason = e.response.reason if e.response is not None else ""
-            raise UserException(f"UKG WFM API error on {url}: HTTP {status} {reason}") from e
+            raise UserException(f"UKG WFM API error on {_endpoint(url)}: HTTP {status} {reason}") from e
         try:
             return resp.json()
         except ValueError as e:
-            raise UserException(f"UKG WFM returned non-JSON response for {url}") from e
+            raise UserException(f"UKG WFM returned non-JSON response for {_endpoint(url)}") from e
 
     @backoff.on_exception(
         backoff.expo,

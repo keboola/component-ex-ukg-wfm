@@ -1,0 +1,24 @@
+{
+  "files": {},
+  "hash_algorithm": "sha256",
+  "tables": {
+    "accruals_transactions.csv": {
+      "columns": [
+        "accrualTransactions",
+        "employeeId_id",
+        "employeeId_name",
+        "employeeId_qualifier"
+      ],
+      "hash": "sha256:f48c656747d74ceef2be7a4504a50d8107c85aa388632a55782813cd1ee481f6",
+      "row_count": 4,
+      "size_bytes": 68200
+    },
+    "accruals_transactions.csv.manifest": {
+      "columns": null,
+      "hash": "sha256:c927291594527494951dbcf2405de649a67a4b6c95e925d9c859f5d3e428f6a1",
+      "row_count": null,
+      "size_bytes": 784
+    }
+  },
+  "version": "1.0"
+}

@@ -32,15 +32,69 @@ from configuration import Configuration
 # comments) — keeping only numeric ids, dates, numbers, booleans and enums, which are the
 # structural data that prove the extraction without exposing employee PII. Host rewriting maps the
 # real tenant host to a placeholder, and a CallbackSanitizer caps record volume so cassettes stay
-# small. keboola.vcr is a dev-only dependency (via keboola.datadirtest); the production image is
-# built with `uv sync --no-dev`, so guard the import — VCR_SANITIZERS is only consumed by the
-# recording harness.
+# small.
+#
+# scrub_before_read (keboola.vcr >= 0.7.0): tagging a sanitizer makes it redact the HTTP response
+# BEFORE the component consumes it at record time (in addition to the cassette), so expected/
+# tables, logs.json and output_snapshot.json are captured already-scrubbed and match replay — no
+# post-hoc regeneration needed. We tag ONLY the identity/free-text redaction (BodyFieldSanitizer)
+# and the array cap; credentials, the OAuth token and numeric employee ids must stay REAL while the
+# component runs (it round-trips the token into the Authorization header and hyperfind ids into
+# later request bodies — a pre-read placeholder there trips the recorder's round-trip guard), so
+# DefaultSanitizer and the host rewrite stay cassette-only.
+#
+# keboola.vcr is a dev-only dependency (via keboola.datadirtest); the production image is built with
+# `uv sync --no-dev`, so guard the import — VCR_SANITIZERS is only consumed by the recording harness.
 try:
     import json as _json
 
-    from keboola.vcr import CallbackSanitizer, DefaultSanitizer, UrlPatternSanitizer
+    from keboola.vcr import BodyFieldSanitizer, CallbackSanitizer, DefaultSanitizer, UrlPatternSanitizer
 
     _MAX_ARRAY_ITEMS = 25
+
+    # Identifying / free-text fields WFM returns. Redacted both in the cassette (DefaultSanitizer)
+    # and before the component reads the response (BodyFieldSanitizer, scrub_before_read). No numeric
+    # ids here — those are round-tripped into later requests and must survive recording.
+    _IDENTITY_FIELDS = [
+        # Credential / person identity (already vetted).
+        "username",
+        "firstName",
+        "lastName",
+        "fullName",
+        "displayName",
+        "updateByPersonFullName",
+        "personNumber",
+        # Identifying names and free-text fields across WFM resources.
+        "name",
+        "qualifier",
+        "shortName",
+        "typeName",
+        "description",
+        "functionalAreaName",
+        "parentName",
+        "holidayDisplayName",
+        "dataSourceDisplayName",
+        "label",
+        "trackingLabel",
+        "laborCategoryEntryDescription",
+        "commentNotes",
+        "commentsNotes",
+        "comments",
+        "comment",
+        "notes",
+        # Org-path / hierarchy locators and free-text question/answer/message fields.
+        "path",
+        "parentPath",
+        "orgPath",
+        # persistentId carries human-readable facility/department labels (e.g. Hyperfind
+        # query keys) that identify the tenant's sites — treat as identifying, not a bare id.
+        "persistentId",
+        "scope",
+        "question",
+        "shortQuestion",
+        "answer",
+        "message",
+    ]
 
     def _truncate_json_arrays(value: Any) -> Any:
         """Recursively cap every JSON array to at most _MAX_ARRAY_ITEMS elements."""
@@ -75,50 +129,19 @@ try:
         return response
 
     VCR_SANITIZERS = [
-        DefaultSanitizer(
-            additional_sensitive_fields=[
-                # Credential / person identity (already vetted).
-                "username",
-                "firstName",
-                "lastName",
-                "fullName",
-                "displayName",
-                "updateByPersonFullName",
-                "personNumber",
-                # Identifying names and free-text fields across WFM resources.
-                "name",
-                "qualifier",
-                "shortName",
-                "typeName",
-                "description",
-                "functionalAreaName",
-                "parentName",
-                "holidayDisplayName",
-                "dataSourceDisplayName",
-                "label",
-                "trackingLabel",
-                "laborCategoryEntryDescription",
-                "commentNotes",
-                "commentsNotes",
-                "comments",
-                "comment",
-                "notes",
-                # Org-path / hierarchy locators and free-text question/answer/message fields.
-                "path",
-                "parentPath",
-                "orgPath",
-                # persistentId carries human-readable facility/department labels (e.g. Hyperfind
-                # query keys) that identify the tenant's sites — treat as identifying, not a bare id.
-                "persistentId",
-                "scope",
-                "question",
-                "shortQuestion",
-                "answer",
-                "message",
-            ]
-        ),
+        # Cassette-only: redact credentials (defaults) + the identity fields in the recorded
+        # request/response. Credentials stay REAL while the component runs (the token is
+        # round-tripped into the Authorization header), redacted only when written to the cassette.
+        DefaultSanitizer(additional_sensitive_fields=_IDENTITY_FIELDS),
+        # Pre-read: redact the identity/free-text fields in the response BEFORE the component reads
+        # it, so expected/ tables, logs.json and output_snapshot.json are natively scrubbed and
+        # match replay. Body-only (no header filtering) and never touches numeric ids/tokens, so
+        # nothing the component round-trips into a later request is lost.
+        BodyFieldSanitizer(fields=_IDENTITY_FIELDS, nested=True, scrub_before_read=True),
         UrlPatternSanitizer(patterns=[(r"[a-z0-9-]+\.prd\.mykronos\.com", "acme.prd.mykronos.com")]),
-        CallbackSanitizer(before_response=_cap_response_records),
+        # Pre-read cap so the component reads the same <=25-item arrays that replay will, keeping
+        # logged row counts and snapshot hashes identical between record and replay.
+        CallbackSanitizer(before_response=_cap_response_records, scrub_before_read=True),
     ]
 except ImportError:
     VCR_SANITIZERS = []

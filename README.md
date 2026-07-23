@@ -107,6 +107,21 @@ Testing
   host is rewritten to a placeholder and employee PII / identifying fields are redacted — and
   volume-capped (≤25 records/array). Re-record with `component-developer:generate-vcr-tests`.
 
+Re-record in a single step (needs `secrets.json` with real tenant credentials):
+
+~~~~
+uv run python -m keboola.datadirtest scaffold --secrets secrets.json --regenerate
+~~~~
+
+`VCR_SANITIZERS` in `src/component.py` tags the PII redaction (`BodyFieldSanitizer`) and the array
+cap with `scrub_before_read=True` (keboola.vcr ≥ 0.7.0), so the component reads already-scrubbed,
+capped responses **at record time** — `expected/`, `logs.json`, and `output_snapshot.json` are
+captured clean and match replay, no post-processing needed. Credentials, the OAuth token, and
+numeric employee ids stay real during recording (they are round-tripped into later requests) and are
+redacted only in the cassette. API-error logs record the endpoint path, not the full URL, so failure
+tests don't diverge on the sanitized-vs-placeholder host. After re-recording, run the cassette
+validation gate (no leaked secrets/host/PII; recordings match intent) before committing.
+
 Run the suite and lint:
 
 ~~~~
