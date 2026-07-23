@@ -138,7 +138,7 @@ class WfmClient:
         except requests.RequestException as e:
             raise UserException(f"UKG WFM request to {_endpoint(url)} failed: {type(e).__name__}") from e
         if resp.status_code == 413:
-            raise PayloadTooLargeError(url)
+            raise PayloadTooLargeError(_endpoint(url))
         try:
             resp.raise_for_status()
         except requests.HTTPError as e:
