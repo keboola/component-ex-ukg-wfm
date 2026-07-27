@@ -327,3 +327,28 @@ def test_scheduling_symbolic_period_unsupported():
                     symbolic_period="4",
                 )
             )
+
+
+def test_batch_size_overrides_resource_batch_limit():
+    # A config batch_size splits the roster into smaller per-request chunks (memory control),
+    # overriding the resource registry default so each multi_read response stays bounded.
+    res = get_resource("timekeeping_timecard_metrics")  # EMPLOYEE_SET_METRICS
+    calls: list[dict] = []
+    with requests_mock.Mocker() as m:
+        c = _client(m)
+
+        def _capture(request, context):
+            calls.append(request.json())
+            return []
+
+        m.post(f"{HOST}/api/v1{res.endpoint_path}", json=_capture)
+        list(chunk_and_read(c, res, [1, 2, 3, 4, 5], "2026-01-01", "2026-01-02", [], batch_size=2))
+    # 5 employees at batch_size 2 -> 3 requests of 2, 2, 1 employees.
+    sizes = [len(c["where"]["employeeSet"]["employees"]["ids"]) for c in calls]
+    assert sizes == [2, 2, 1]
+
+
+def test_timecard_metrics_default_batch_limit_is_memory_safe():
+    # Regression: the all-sections metrics endpoint must not default to the 500-employee batch that
+    # OOMed the 256 MB component; a smaller default keeps one parsed batch response in budget.
+    assert get_resource("timekeeping_timecard_metrics").batch_limit == 100

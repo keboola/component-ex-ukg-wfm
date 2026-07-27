@@ -121,8 +121,11 @@ def chunk_and_read(
     hyperfind_ref: str | None = None,
     page_size: int | None = None,
     max_pages: int | None = None,
+    batch_size: int | None = None,
 ) -> Iterator[dict[str, Any]]:
-    chunk_size = resource.batch_limit or len(emp_ids) or 1
+    # A config batch_size overrides the registry default so a run can shrink the per-request payload
+    # (the whole batch response is parsed into memory) below the component memory limit.
+    chunk_size = batch_size or resource.batch_limit or len(emp_ids) or 1
     chunks = _initial_chunks(emp_ids, chunk_size) if emp_ids else [[]]
     for chunk in chunks:
         yield from _read_chunk_with_shrink(
@@ -377,6 +380,7 @@ def iter_records(
     page_size: int | None = None,
     max_pages: int | None = None,
     hyperfind_threshold: int = 50000,
+    batch_size: int | None = None,
 ) -> Iterator[dict[str, Any]]:
     emp_ids: list[int] = []
     if resource.employee_scope == EmployeeScope.HYPERFIND:
@@ -397,7 +401,7 @@ def iter_records(
     # caller has already skipped window/watermark logic, so read once with the symbolic bound.
     if symbolic_period:
         yield from chunk_and_read(
-            client, resource, emp_ids, "", "", select, symbolic_period, hyperfind_ref, page_size, max_pages
+            client, resource, emp_ids, "", "", select, symbolic_period, hyperfind_ref, page_size, max_pages, batch_size
         )
         return
 
@@ -422,6 +426,7 @@ def iter_records(
                 hyperfind_ref,
                 page_size,
                 max_pages,
+                batch_size,
             )
     else:
         yield from chunk_and_read(
@@ -435,4 +440,5 @@ def iter_records(
             hyperfind_ref,
             page_size,
             max_pages,
+            batch_size,
         )

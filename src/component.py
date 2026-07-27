@@ -234,6 +234,7 @@ class Component(ComponentBase):
             page_size=self._config.page_size,
             max_pages=self._config.max_pages,
             hyperfind_threshold=self._config.hyperfind_threshold,
+            batch_size=self._config.batch_size,
         )
 
     def _stream_and_write_table(

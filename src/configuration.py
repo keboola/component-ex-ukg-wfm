@@ -48,6 +48,10 @@ class Configuration(BaseModel):
     # via raw config JSON if a run needs to be bounded. Both default None so production is unaffected.
     page_size: int | None = Field(default=None, ge=1)
     max_pages: int | None = Field(default=None, ge=1)
+    # Employees per multi_read request; overrides the per-resource registry default. Lower it when a
+    # resource with a large per-employee payload risks the 256 MB memory limit (the whole batch
+    # response is parsed at once), raise it to cut request count. Default None = registry value.
+    batch_size: int | None = Field(default=None, ge=1)
 
     def __init__(self, **data: Any):
         try:

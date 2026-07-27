@@ -209,7 +209,12 @@ RESOURCE_REGISTRY: dict[str, ResourceDef] = {
         endpoint_path="/timekeeping/timecard_metrics/multi_read",
         body_style=BodyStyle.EMPLOYEE_SET_METRICS,
         employee_scope=EmployeeScope.HYPERFIND,
-        batch_limit=500,
+        # No `select` -> the API returns ALL rollup sections (~110 KB/employee measured live), so the
+        # whole batch response is parsed into memory at once. 500 employees (~55 MB wire, several x
+        # that parsed) exceeds the 256 MB component limit; 100 keeps peak well under it. Override per
+        # config with `batch_size` if needed. Accruals ride the same endpoint but with a narrow select
+        # (much smaller payload), so they keep the larger default.
+        batch_limit=100,
         pagination=PaginationStyle.NONE,
         incremental_style=IncrementalStyle.DATE_WINDOW,
         date_field="start",
