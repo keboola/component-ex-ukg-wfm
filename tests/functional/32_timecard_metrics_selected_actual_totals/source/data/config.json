@@ -12,7 +12,7 @@
     "hyperfind_ref": "1",
     "hyperfind_threshold": 50000,
     "symbolic_period": "1",
-    "select": [
+    "metric_groups": [
       "ACTUAL_TOTALS"
     ],
     "poll_interval_seconds": 15,

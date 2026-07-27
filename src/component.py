@@ -229,7 +229,7 @@ class Component(ComponentBase):
             hyperfind_ref=self._config.hyperfind_ref,
             since_iso=since_iso,
             until_iso=until_iso,
-            select=self._config.select,
+            select=self._config.effective_select,
             symbolic_period=self._config.symbolic_period,
             page_size=self._config.page_size,
             max_pages=self._config.max_pages,

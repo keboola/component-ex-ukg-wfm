@@ -33,3 +33,20 @@ def test_missing_host_raises_userexception():
     del data["host"]
     with pytest.raises(UserException):
         Configuration(**data, resource="persons")
+
+
+def test_effective_select_folds_metric_groups():
+    # The timecard-metrics picker (metric_groups) feeds the API select when set.
+    cfg = Configuration(**_root(), resource="timekeeping_timecard_metrics", metric_groups=["ACTUAL_TOTALS"])
+    assert cfg.effective_select == ["ACTUAL_TOTALS"]
+
+
+def test_effective_select_prefers_explicit_select():
+    # Free-text select (other resources / power users) wins over the picker if both are set.
+    cfg = Configuration(**_root(), resource="persons", select=["FOO"], metric_groups=["ACTUAL_TOTALS"])
+    assert cfg.effective_select == ["FOO"]
+
+
+def test_effective_select_empty_by_default():
+    cfg = Configuration(**_root(), resource="persons")
+    assert cfg.effective_select == []

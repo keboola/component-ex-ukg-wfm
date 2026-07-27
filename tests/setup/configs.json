@@ -536,7 +536,7 @@
   },
   {
     "name": "32_timecard_metrics_selected_actual_totals",
-    "description": "timecard_metrics with select=[ACTUAL_TOTALS] (metric-group picker): proves the chosen select is sent so the API returns ONLY actualTotals — the targeted, memory-lean read.",
+    "description": "timecard_metrics with metric_groups=[ACTUAL_TOTALS] (the picker field): proves the picked group folds into the API select so the response is ONLY actualTotals — targeted, memory-lean.",
     "config": {
       "action": "run",
       "parameters": {
@@ -551,7 +551,7 @@
         "hyperfind_ref": "1",
         "hyperfind_threshold": 50000,
         "symbolic_period": "1",
-        "select": ["ACTUAL_TOTALS"],
+        "metric_groups": ["ACTUAL_TOTALS"],
         "poll_interval_seconds": 15,
         "max_wait_seconds": 1800
       }

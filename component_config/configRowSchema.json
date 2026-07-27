@@ -180,26 +180,16 @@
       "type": "array",
       "title": "Select Fields",
       "description": "Optional list of API 'select' elements to request. Leave empty to use the resource default.",
-      "format": "select",
-      "uniqueItems": true,
       "items": {
-        "type": "string",
-        "enum": []
+        "type": "string"
       },
       "options": {
-        "async": {
-          "label": "Load Timecard Metrics",
-          "action": "list_timecard_metrics",
-          "cache": true
-        },
-        "tags": true,
-        "tooltip": "For Timekeeping — Timecard Metrics: click Load Timecard Metrics and pick one or more metric groups (ACTUAL_TOTALS, SCHEDULED_TOTALS, PROJECTED_TOTALS, TOTALS, ACCRUAL_SUMMARY, ACCRUAL_TRANSACTIONS) — each maps to one response section; leave empty to return all sections. For every other resource, type the API field name(s) to select directly — the Load button's metric list does not apply to them.",
+        "tooltip": "Type the API field name(s) to select directly, one per item. Leave empty to use the resource default.",
         "dependencies": {
           "resource": [
             "persons",
             "timekeeping_punches",
             "timekeeping_timecards",
-            "timekeeping_timecard_metrics",
             "scheduling_schedules",
             "scheduling_shifts",
             "scheduling_open_shifts",
@@ -220,6 +210,30 @@
         }
       },
       "propertyOrder": 60
+    },
+    "metric_groups": {
+      "type": "array",
+      "title": "Timecard Metric Groups",
+      "description": "Optional list of metric groups (select tokens) to pull for Timekeeping — Timecard Metrics; each maps to one response section. Leave empty to return ALL sections (larger payload).",
+      "format": "select",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": []
+      },
+      "options": {
+        "async": {
+          "label": "Load Timecard Metrics",
+          "action": "list_timecard_metrics",
+          "cache": true
+        },
+        "tags": true,
+        "tooltip": "Click Load Timecard Metrics and pick one or more metric groups (ACTUAL_TOTALS, SCHEDULED_TOTALS, PROJECTED_TOTALS, TOTALS, ACCRUAL_SUMMARY, ACCRUAL_TRANSACTIONS) — each maps to one response section. Leave empty to return all sections. You can also type a metric group token directly.",
+        "dependencies": {
+          "resource": ["timekeeping_timecard_metrics"]
+        }
+      },
+      "propertyOrder": 61
     },
     "symbolic_period": {
       "type": "string",
