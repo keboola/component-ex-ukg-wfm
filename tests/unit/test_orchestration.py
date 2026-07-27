@@ -29,6 +29,25 @@ def test_resolve_employee_ids_from_hyperfind():
     body = captured[0]
     assert body["hyperfind"] == {"id": 253}
     assert body["dateRange"] == {"startDate": "2026-01-01", "endDate": "2026-02-01"}
+    # A high default threshold is always sent, else a broad Hyperfind 400s with WCO-112003.
+    assert body["threshold"] == 50000
+
+
+def test_resolve_employee_ids_forwards_custom_threshold():
+    # A caller-supplied threshold overrides the default and is sent verbatim in the body.
+    captured: list[dict] = []
+    with requests_mock.Mocker() as m:
+        c = _client(m)
+
+        def _capture(request, context):
+            captured.append(request.json())
+            return {"count": 0, "result": {"refs": [], "basePersons": []}}
+
+        m.post(f"{HOST}/api/v1/commons/hyperfind/execute", json=_capture)
+        resolve_employee_ids(
+            c, "All People", "2026-01-01T00:00:00+00:00", "2026-02-01T00:00:00+00:00", threshold=100000
+        )
+    assert captured[0]["threshold"] == 100000
 
 
 def test_hyperfind_empty_result_short_circuits_without_unscoped_read():

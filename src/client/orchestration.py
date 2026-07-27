@@ -27,19 +27,25 @@ def resolve_employee_ids(
     hyperfind_ref: str | None,
     since_iso: str | None = None,
     until_iso: str | None = None,
+    threshold: int = 50000,
 ) -> list[int]:
     """Execute a Hyperfind and return its employee IDs (from result.refs[].id).
 
     hyperfind/execute REQUIRES a dateRange and returns {"count", "result": {"refs":[{id,qualifier}],
-    "basePersons":[...]}}. A too-large Hyperfind (> tenant threshold, e.g. "All Home" = 11k) is
-    rejected server-side (WCO-112003) and surfaces as a UserException — pick a narrower Hyperfind.
+    "basePersons":[...]}}. UKG caps the result at a per-request `threshold`; exceeding it is rejected
+    server-side (WCO-112003). The tenant default is low, so a broad Hyperfind ("All Home"/"All People")
+    400s unless we send a higher `threshold` — default 50000, proven live for a full-org roster.
     """
     ref: dict[str, Any] = {"qualifier": "All Home"}
     if hyperfind_ref:
         ref = {"id": int(hyperfind_ref)} if str(hyperfind_ref).lstrip("-").isdigit() else {"qualifier": hyperfind_ref}
     start = _as_date(since_iso) or _as_date(until_iso) or datetime.now().strftime("%Y-%m-%d")
     end = _as_date(until_iso) or start
-    body: dict[str, Any] = {"hyperfind": ref, "dateRange": {"startDate": start, "endDate": end}}
+    body: dict[str, Any] = {
+        "hyperfind": ref,
+        "dateRange": {"startDate": start, "endDate": end},
+        "threshold": threshold,
+    }
     result = client.post_json("/commons/hyperfind/execute", body)
     if not isinstance(result, dict):
         return []
@@ -343,10 +349,11 @@ def iter_records(
     symbolic_period: str | None = None,
     page_size: int | None = None,
     max_pages: int | None = None,
+    hyperfind_threshold: int = 50000,
 ) -> Iterator[dict[str, Any]]:
     emp_ids: list[int] = []
     if resource.employee_scope == EmployeeScope.HYPERFIND:
-        emp_ids = resolve_employee_ids(client, hyperfind_ref, since_iso, until_iso)
+        emp_ids = resolve_employee_ids(client, hyperfind_ref, since_iso, until_iso, hyperfind_threshold)
         # An empty Hyperfind result means "no matching employees". Without this guard the
         # request would ship with no where.employees.ids, which WFM treats as ALL employees
         # — a huge, wrongly-scoped read. Org-level resources (employee_scope != HYPERFIND)

@@ -28,6 +28,10 @@ class Configuration(BaseModel):
     until: str | None = None
     symbolic_period: str | None = None
     hyperfind_ref: str | None = None
+    # Max employees a Hyperfind may resolve before UKG rejects hyperfind/execute with WCO-112003.
+    # UKG's per-request default is low, so a broad Hyperfind ("All Home"/"All People") 400s unless
+    # we raise the cap. 50000 mirrors the value proven in production for a full-org roster.
+    hyperfind_threshold: int = Field(default=50000, ge=1)
     select: list[str] = Field(default_factory=list)
     # User-supplied primary key for the output table. Overrides the resource registry default and,
     # on incremental load, enables upsert even for a registry-keyless resource.

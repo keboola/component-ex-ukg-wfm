@@ -233,6 +233,7 @@ class Component(ComponentBase):
             symbolic_period=self._config.symbolic_period,
             page_size=self._config.page_size,
             max_pages=self._config.max_pages,
+            hyperfind_threshold=self._config.hyperfind_threshold,
         )
 
     def _stream_and_write_table(

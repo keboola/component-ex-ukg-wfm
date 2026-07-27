@@ -120,7 +120,6 @@
         "tooltip": "The Hyperfind query that resolves which employees this resource extracts. Click Load Hyperfinds and pick from the tenant's saved queries (public, personal, and system). Leave unset to fall back to 'All Home', which large tenants reject above their size threshold — pick a narrower query instead.",
         "dependencies": {
           "resource": [
-            "persons",
             "timekeeping_punches",
             "timekeeping_timecards",
             "timekeeping_timecard_metrics",
@@ -143,6 +142,39 @@
         }
       },
       "propertyOrder": 50
+    },
+    "hyperfind_threshold": {
+      "type": "integer",
+      "title": "Hyperfind Threshold",
+      "description": "Maximum number of employees the Hyperfind Query above may resolve before the request is rejected.",
+      "default": 50000,
+      "minimum": 1,
+      "options": {
+        "tooltip": "UKG rejects a Hyperfind that resolves more employees than this cap with error WCO-112003. UKG's per-request default is low, so a broad Hyperfind ('All Home'/'All People') fails unless it is raised. Leave at 50000 unless your tenant roster is larger, or you want to cap the roster deliberately.",
+        "dependencies": {
+          "resource": [
+            "timekeeping_punches",
+            "timekeeping_timecards",
+            "timekeeping_timecard_metrics",
+            "scheduling_schedules",
+            "scheduling_shifts",
+            "scheduling_open_shifts",
+            "scheduling_swaps",
+            "accruals_balances",
+            "accruals_transactions",
+            "accruals_summaries",
+            "leave_cases",
+            "leave_edits",
+            "attendance_records",
+            "attendance_events",
+            "attestations",
+            "work_activities",
+            "work_activity_shifts",
+            "work_activity_net_changes"
+          ]
+        }
+      },
+      "propertyOrder": 55
     },
     "select": {
       "type": "array",
