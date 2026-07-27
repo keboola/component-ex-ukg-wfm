@@ -352,3 +352,36 @@ def test_timecard_metrics_default_batch_limit_is_memory_safe():
     # Regression: the all-sections metrics endpoint must not default to the 500-employee batch that
     # OOMed the 256 MB component; a smaller default keeps one parsed batch response in budget.
     assert get_resource("timekeeping_timecard_metrics").batch_limit == 100
+
+
+def test_timecard_metrics_sends_partial_success():
+    # timecard_metrics/multi_read needs ?partial_success=true, or the API silently drops ACTUAL_TOTALS
+    # for callers without full access to every returned employee.
+    res = get_resource("timekeeping_timecard_metrics")
+    captured: dict = {}
+    with requests_mock.Mocker() as m:
+        c = _client(m)
+
+        def _cap(request, context):
+            captured["qs"] = request.qs
+            return []
+
+        m.post(f"{HOST}/api/v1{res.endpoint_path}", json=_cap)
+        list(paginate_multi_read(c, res, {"where": {}}))
+    assert captured["qs"].get("partial_success") == ["true"]
+
+
+def test_non_metrics_read_omits_partial_success():
+    # partial_success is metrics-endpoint-specific; a plain multi_read must not carry it.
+    res = get_resource("timekeeping_timecards")  # WHERE_EMPLOYEES_IDS, not EMPLOYEE_SET_METRICS
+    captured: dict = {}
+    with requests_mock.Mocker() as m:
+        c = _client(m)
+
+        def _cap(request, context):
+            captured["qs"] = request.qs
+            return {"records": []}
+
+        m.post(f"{HOST}/api/v1{res.endpoint_path}", json=_cap)
+        list(paginate_multi_read(c, res, {"where": {}}))
+    assert "partial_success" not in captured["qs"]

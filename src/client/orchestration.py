@@ -80,7 +80,12 @@ def paginate_multi_read(
     if resource.method == HttpMethod.GET:
         result = client.get_json(resource.endpoint_path)
     else:
-        result = client.post_json(resource.endpoint_path, body)
+        # timecard_metrics/multi_read (all EMPLOYEE_SET_METRICS resources) needs partial_success=true:
+        # without it the API silently omits ACTUAL_TOTALS for callers lacking full access to every
+        # returned employee (per the UKG reference) — VERIFIED live (totals absent without it). Harmless
+        # for the other metric groups. It's a query param; the response shape is unchanged.
+        params = {"partial_success": "true"} if resource.body_style == BodyStyle.EMPLOYEE_SET_METRICS else None
+        result = client.post_json(resource.endpoint_path, body, params=params)
     yield from extract_records(result, resource.records_key)
 
 

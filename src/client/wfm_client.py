@@ -113,8 +113,8 @@ class WfmClient:
         """Public base URL (``https://<host>/api/v1``) for callers building raw download URLs."""
         return self._api_base
 
-    def post_json(self, path: str, body: dict[str, Any]) -> Any:
-        return self._call("POST", f"{self._api_base}{path}", json_body=body)
+    def post_json(self, path: str, body: dict[str, Any], params: dict[str, Any] | None = None) -> Any:
+        return self._call("POST", f"{self._api_base}{path}", json_body=body, params=params)
 
     def get_json(self, path: str, params: dict[str, Any] | None = None) -> Any:
         return self._call("GET", f"{self._api_base}{path}", params=params)

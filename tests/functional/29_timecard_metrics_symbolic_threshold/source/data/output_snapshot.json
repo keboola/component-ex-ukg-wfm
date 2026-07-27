@@ -33,9 +33,9 @@
         "shiftProjectedTotalSummary",
         "shiftScheduledTotalSummary"
       ],
-      "hash": "sha256:785d1cc1e7b28399e87913174529d337c5313ec84c624e57184a7b8644284ff4",
+      "hash": "sha256:742de3685ea15194c1a208037b102f697f2539d4b6909748e6245cf6c858a8db",
       "row_count": 26,
-      "size_bytes": 2480164
+      "size_bytes": 2185693
     },
     "timekeeping_timecard_metrics.csv.manifest": {
       "columns": null,
