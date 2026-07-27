@@ -180,6 +180,24 @@ def _date_range(since_iso: str, until_iso: str) -> dict[str, str] | None:
     return {"startDate": start, "endDate": end} if start and end else None
 
 
+def _symbolic_period_ref(symbolic_period: str) -> dict[str, int]:
+    """Reference a symbolic period by its numeric id, the only form WFM accepts here.
+
+    The id comes from GET /commons/symbolicperiod (surfaced by the list_symbolic_periods dropdown,
+    e.g. 1 = Current Pay Period). A qualifier string is rejected with WTK-147500 ("bad reference").
+    VERIFIED live: {"symbolicPeriod": {"id": 1}} nested under dateRange returns 200 for
+    timecard_metrics/multi_read and attestation/multi_read; employee_swap takes it as a sibling of
+    the employees array.
+    """
+    try:
+        return {"id": int(symbolic_period)}
+    except (TypeError, ValueError) as e:
+        raise UserException(
+            f"symbolic_period must be a numeric symbolic-period id (e.g. 1 = Current Pay Period); "
+            f"got {symbolic_period!r}. Pick one with the Symbolic Period dropdown."
+        ) from e
+
+
 def _build_body(
     resource: ResourceDef,
     chunk: list[int],
@@ -222,8 +240,9 @@ def _build_body(
         employee_set: dict[str, Any] = {}
         if chunk:
             employee_set["employees"] = {"ids": chunk}
+        # A symbolic period rides inside dateRange (by id), NOT as a sibling field — VERIFIED 200.
         if symbolic_period:
-            employee_set["symbolicPeriod"] = {"qualifier": symbolic_period}
+            employee_set["dateRange"] = {"symbolicPeriod": _symbolic_period_ref(symbolic_period)}
         elif date_range:
             employee_set["dateRange"] = date_range
         body["where"] = {"employeeSet": employee_set}
@@ -235,8 +254,9 @@ def _build_body(
         emp_criterion: dict[str, Any] = {}
         if chunk:
             emp_criterion["employees"] = [{"id": emp_id} for emp_id in chunk]
+        # employee_swap takes symbolicPeriod (by id) as a sibling of the employees array — VERIFIED 200.
         if symbolic_period:
-            emp_criterion["symbolicPeriod"] = {"qualifier": symbolic_period}
+            emp_criterion["symbolicPeriod"] = _symbolic_period_ref(symbolic_period)
         elif date_range:
             emp_criterion["startDate"] = date_range["startDate"]
             emp_criterion["endDate"] = date_range["endDate"]
@@ -257,8 +277,9 @@ def _build_body(
         where = {}
         if chunk:
             where["employees"] = [{"id": emp_id} for emp_id in chunk]
+        # A symbolic period rides inside dateRange (by id) — VERIFIED 200 for attestation/multi_read.
         if symbolic_period:
-            where["symbolicPeriod"] = {"qualifier": symbolic_period}
+            where["dateRange"] = {"symbolicPeriod": _symbolic_period_ref(symbolic_period)}
         elif date_range:
             where["dateRange"] = date_range
         body["where"] = where
@@ -282,12 +303,16 @@ def _build_body(
         body["select"] = sel
 
     if style == BodyStyle.WHERE_EMPLOYEE_REFS:
+        # schedule/multi_read scopes by employeeRefs + flat start/end dates and does NOT accept a
+        # symbolicPeriod here (WFP-90011 "Unrecognized property") — require an explicit window.
+        if symbolic_period:
+            raise UserException(
+                f"Resource '{resource.name}' does not support a symbolic period; set Start/End dates instead."
+            )
         employees: dict[str, Any] = {}
         if chunk:
             employees["employeeRefs"] = {"ids": chunk}
-        if symbolic_period:
-            employees["symbolicPeriod"] = {"qualifier": symbolic_period}
-        elif date_range:
+        if date_range:
             employees["startDate"] = date_range["startDate"]
             employees["endDate"] = date_range["endDate"]
         body["where"] = {"employees": employees}
@@ -296,8 +321,9 @@ def _build_body(
     if style == BodyStyle.TOP_EMPLOYEES_IDS:
         if chunk:
             body["employees"] = {"ids": chunk}
+        # A symbolic period rides inside the top-level dateRange (by id) — VERIFIED 200 for leave_cases.
         if symbolic_period:
-            body["symbolicPeriod"] = {"qualifier": symbolic_period}
+            body["dateRange"] = {"symbolicPeriod": _symbolic_period_ref(symbolic_period)}
         elif date_range:
             body["dateRange"] = date_range
         return body
@@ -305,8 +331,9 @@ def _build_body(
     # Default: BodyStyle.WHERE_EMPLOYEES_IDS
     if chunk:
         body["where"] = {"employees": {"ids": chunk}}
+    # A symbolic period rides inside where.dateRange (by id) — VERIFIED 200 for timecard/multi_read.
     if symbolic_period:
-        body.setdefault("where", {})["symbolicPeriod"] = {"qualifier": symbolic_period}
+        body.setdefault("where", {})["dateRange"] = {"symbolicPeriod": _symbolic_period_ref(symbolic_period)}
     elif date_range:
         body.setdefault("where", {})["dateRange"] = date_range
     return body

@@ -483,5 +483,41 @@
         "#password": "DUMMY_PASSWORD"
       }
     }
+  },
+  {
+    "name": "29_timecard_metrics_symbolic_threshold",
+    "description": "Parity with the customer prod row: timecard_metrics, broad hyperfind_ref=1 + hyperfind_threshold=50000 + symbolic_period id 1 (Current Pay Period), empty since. Proves the threshold clears the Hyperfind AND that the symbolic period is sent as dateRange.symbolicPeriod.id → 200.",
+    "config": {
+      "action": "run",
+      "parameters": {
+        "host": "https://acme.prd.mykronos.com",
+        "client_id": "DUMMY_CLIENT_ID",
+        "#client_secret": "DUMMY_CLIENT_SECRET",
+        "username": "DUMMY_USER",
+        "#password": "DUMMY_PASSWORD",
+        "resource": "timekeeping_timecard_metrics",
+        "load_type": "full_load",
+        "since": "",
+        "hyperfind_ref": "1",
+        "hyperfind_threshold": 50000,
+        "symbolic_period": "1",
+        "poll_interval_seconds": 15,
+        "max_wait_seconds": 1800
+      }
+    }
+  },
+  {
+    "name": "30_listSymbolicPeriods",
+    "description": "Sync action list_symbolic_periods: list the tenant's symbolic periods (GET /commons/symbolicperiod) for the Symbolic Period dropdown.",
+    "config": {
+      "action": "list_symbolic_periods",
+      "parameters": {
+        "host": "https://acme.prd.mykronos.com",
+        "client_id": "DUMMY_CLIENT_ID",
+        "#client_secret": "DUMMY_CLIENT_SECRET",
+        "username": "DUMMY_USER",
+        "#password": "DUMMY_PASSWORD"
+      }
+    }
   }
 ]

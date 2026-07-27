@@ -347,6 +347,30 @@ class Component(ComponentBase):
             elements.append(SelectElement(value=str(qid), label=f"{name} ({qid})"))
         return elements
 
+    @sync_action("list_symbolic_periods")
+    def list_symbolic_periods(self) -> list[SelectElement]:
+        """Populate the Symbolic Period dropdown from the tenant's symbolic periods.
+
+        GET /commons/symbolicperiod returns [{id, symbolicId, name, periodTypeId, sortOrder}]. The
+        id is tenant-specific and the only form WFM accepts (a qualifier string is rejected), so the
+        value is the numeric id; the label pairs the name with its period type (e.g.
+        "Current Pay Period [TIMEKEEPING]") because names repeat across types (a metrics/timekeeping
+        read wants a TIMEKEEPING period, a scheduling read a SCHEDULING one).
+        """
+        result = self.client.get_json("/commons/symbolicperiod")
+        periods = result if isinstance(result, list) else []
+        elements: list[SelectElement] = []
+        for period in sorted(
+            (p for p in periods if isinstance(p, dict) and "id" in p),
+            key=lambda p: (str(p.get("periodTypeId") or ""), p.get("sortOrder") or 0),
+        ):
+            pid = period["id"]
+            name = period.get("name") or period.get("symbolicId") or str(pid)
+            ptype = period.get("periodTypeId")
+            label = f"{name} [{ptype}]" if ptype else str(name)
+            elements.append(SelectElement(value=str(pid), label=label))
+        return elements
+
     @sync_action("list_columns")
     def list_columns(self) -> list[SelectElement]:
         """Populate the Primary Key dropdown from the resource's output-table columns in Storage.

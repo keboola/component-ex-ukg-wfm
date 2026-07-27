@@ -87,7 +87,9 @@ Incremental & windowing
   is populated only after the first run has created that table (requires the component's
   `forwardToken` flag, set once in the Developer Portal by an admin).
 - A **symbolic period** replaces the date window entirely — when set, Start Date / End Date are
-  ignored, so configure one or the other, not both.
+  ignored, so configure one or the other, not both. It is a dropdown backed by the
+  `list_symbolic_periods` sync action; you pick a period by name and the stored value is its numeric
+  id (WFM rejects a name). Not supported for scheduling resources, which need an explicit window.
 - The **Hyperfind Query** field is a dropdown backed by the `list_hyperfinds` sync action, which
   lists the tenant's saved queries (public, personal, and system — including negative-id system
   queries); you pick by name and the stored value is the query id. Leave it unset to fall back to

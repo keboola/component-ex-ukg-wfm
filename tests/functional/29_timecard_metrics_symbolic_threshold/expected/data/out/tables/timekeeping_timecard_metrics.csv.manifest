@@ -1,0 +1,262 @@
+{
+  "incremental": false,
+  "write_always": false,
+  "delimiter": ",",
+  "enclosure": "\"",
+  "manifest_type": "out",
+  "has_header": true,
+  "schema": [
+    {
+      "name": "absenceExceptionData_employee_id",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "absenceExceptionData_employee_name",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "absenceExceptionData_employee_qualifier",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "absenceExceptionData_isExcusedAbsence",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "absenceExceptionData_isUnexcusedAbsence",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "absenceExceptionsWithPosition",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "accrualSummaryData",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "accrualTransactions",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "actualTotals",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "actualTotalsExcludeCorrections",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "dailyActualTotalSummary",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "dailyProjectedTotalSummary",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "dailyScheduledTotalSummary",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "employeeId_id",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "primary_key": true
+    },
+    {
+      "name": "employeeId_name",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "employeeId_qualifier",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "exceptioncounts",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "exceptioncountsUnreviewed",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "ftptData",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "ftptDataAll",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "musterReportDailyData",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "musterReportSummaryData",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "projectedTotals",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "projectedTotalsExcludeCorrections",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "scheduledTotals",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "shiftActualTotalSummary",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "shiftProjectedTotalSummary",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "nullable": true
+    },
+    {
+      "name": "shiftScheduledTotalSummary",
+      "data_type": {
+        "base": {
+          "type": "STRING"
+        }
+      },
+      "nullable": true
+    }
+  ]
+}

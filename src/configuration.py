@@ -26,6 +26,9 @@ class Configuration(BaseModel):
     since: str | None = None
     # Optional upper bound of the fetch window; empty = now (run start).
     until: str | None = None
+    # Numeric symbolic-period id (as a string, e.g. "1" = Current Pay Period) from
+    # GET /commons/symbolicperiod — a rolling window that replaces since/until. Pick it with the
+    # Symbolic Period dropdown; WFM rejects a qualifier name (WTK-147500). Empty = use since/until.
     symbolic_period: str | None = None
     hyperfind_ref: str | None = None
     # Max employees a Hyperfind may resolve before UKG rejects hyperfind/execute with WCO-112003.

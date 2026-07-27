@@ -214,9 +214,17 @@
     "symbolic_period": {
       "type": "string",
       "title": "Symbolic Period",
-      "description": "Optional symbolic period used instead of an explicit start/end date window.",
+      "format": "select",
+      "enum": [],
+      "description": "Rolling period window (e.g. Current Pay Period) used instead of an explicit start/end date window",
       "options": {
-        "tooltip": "UKG-named relative period ranges (e.g. `Current Pay Period`, `Previous Pay Period`, `Yesterday`, `Today`) sent to the API instead of an explicit window. If set, it takes precedence and Start Date / End Date are ignored — configure EITHER a symbolic period OR an explicit Start/End window, not both. Applies only to date-windowed resources; ignored otherwise. See the UKG Pro WFM API reference: https://developer.ukg.com/wfm/reference"
+        "async": {
+          "label": "Load Symbolic Periods",
+          "action": "list_symbolic_periods",
+          "autoload": true,
+          "cache": true
+        },
+        "tooltip": "The UKG-named rolling period range (e.g. `Current Pay Period`, `Previous Pay Period`, `Yesterday`, `Today`) sent to the API instead of an explicit window. Click Load Symbolic Periods and pick from the tenant's periods; the value stored is the numeric id — WFM rejects a period name, only the id works. If set, it takes precedence and Start Date / End Date are ignored — configure EITHER a symbolic period OR an explicit Start/End window, not both. Not supported for scheduling resources (schedule/multi_read rejects a symbolic period) — those require an explicit Start/End date window. Leave empty to use the Start/End date window instead. See the UKG Pro WFM API reference: https://developer.ukg.com/wfm/reference"
       },
       "propertyOrder": 70
     },
