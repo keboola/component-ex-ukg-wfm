@@ -228,7 +228,7 @@
           "cache": true
         },
         "tags": true,
-        "tooltip": "Click Load Timecard Metrics and pick one or more metric groups (ACTUAL_TOTALS, SCHEDULED_TOTALS, PROJECTED_TOTALS, TOTALS, ACCRUAL_SUMMARY, ACCRUAL_TRANSACTIONS) — each maps to one response section. Leave empty to return all sections. You can also type a metric group token directly.",
+        "tooltip": "Click Load Timecard Metrics and pick one or more metric groups from the tenant's full list; each maps to one response section. UKG recommends selecting the groups you need (up to 10) rather than leaving it empty, which returns every section. You can also type a metric group token directly.",
         "dependencies": {
           "resource": ["timekeeping_timecard_metrics"]
         }

@@ -376,22 +376,46 @@ class Component(ComponentBase):
     def list_timecard_metrics(self) -> list[SelectElement]:
         """Populate the metric-group picker for the timecard_metrics resource.
 
-        These are the `select` tokens for POST /timekeeping/timecard_metrics/multi_read — a fixed
-        UKG vocabulary (an unknown token is rejected WFP-90009), so the list is curated in code
-        rather than fetched. Each chosen token maps to one response section (shown in the label).
-        Leaving the field empty makes the API return ALL sections — a much larger payload — so
-        picking only the sections you need also keeps the per-request response within memory.
+        These are the full `select` tokens for POST /timekeeping/timecard_metrics/multi_read — a
+        fixed, universal UKG API vocabulary (an unknown token is rejected WFP-90009), taken verbatim
+        from the UKG reference and spot-verified 200 live:
+        https://developer.ukg.com/wfm/reference/retrieve-timecard-data-for-multiple-employees
+        Picking specific groups (UKG recommends <=10) instead of leaving the field empty (which
+        returns every section) keeps each per-request response within the component memory limit.
         """
-        # (token, response section) pairs — VERIFIED live 200 against the tenant.
+        # (token, human label) — the complete documented set. Order mirrors the UKG reference.
         groups = [
-            ("ACTUAL_TOTALS", "actualTotals"),
-            ("SCHEDULED_TOTALS", "scheduledTotals"),
-            ("PROJECTED_TOTALS", "projectedTotals"),
-            ("TOTALS", "tktotalsData"),
-            ("ACCRUAL_SUMMARY", "accrualSummaryData"),
-            ("ACCRUAL_TRANSACTIONS", "accrualTransactions"),
+            ("FTPTDATA_ALL", "Full/part-time data — all weeks"),
+            ("FTPTDATA", "Full/part-time data — worked weeks"),
+            ("AVERAGING", "Averaging totals"),
+            ("SCHEDULED_TOTALS", "Scheduled totals"),
+            ("CONTRACT_TOTALS", "Contract totals"),
+            ("PROJECTED_TOTALS", "Projected totals (incl. corrections)"),
+            ("PROJECTED_TOTALS_ONLY_CORRECTIONS", "Projected totals — corrections only"),
+            ("PROJECTED_TOTALS_EXCLUDE_CORRECTIONS", "Projected totals — exclude corrections"),
+            ("ACTUAL_TOTALS", "Actual totals"),
+            ("ACTUAL_TOTALS_ONLY_CORRECTIONS", "Actual totals — corrections only"),
+            ("ACTUAL_TOTALS_EXCLUDE_CORRECTIONS", "Actual totals — exclude corrections"),
+            ("EXCEPTION_TOTAL", "Exception count — total"),
+            ("EXCEPTION_TOTAL_UNREVIEWED", "Exception count — unreviewed"),
+            ("EXCEPTION_TOTAL_EMPLOYEE_JUSTIFIED", "Exception count — employee-justified"),
+            ("EXCEPTION_TOTAL_MANAGER_JUSTIFIED", "Exception count — manager-justified"),
+            ("EXCEPTION_TOTAL_AUTO_RESOLVED", "Exception count — auto-resolved"),
+            ("SHIFT_ACTUAL_TOTAL_SUMMARY", "Shift summary — actual"),
+            ("SHIFT_SCHEDULED_TOTAL_SUMMARY", "Shift summary — scheduled"),
+            ("SHIFT_CONTRACT_TOTAL_SUMMARY", "Shift summary — contract"),
+            ("SHIFT_PROJECTED_TOTAL_SUMMARY", "Shift summary — projected"),
+            ("DAILY_ACTUAL_TOTAL_SUMMARY", "Daily summary — actual"),
+            ("DAILY_SCHEDULED_TOTAL_SUMMARY", "Daily summary — scheduled"),
+            ("DAILY_CONTRACT_TOTAL_SUMMARY", "Daily summary — contract"),
+            ("DAILY_PROJECTED_TOTAL_SUMMARY", "Daily summary — projected"),
+            ("ACCRUAL_SUMMARY", "Accrual summary"),
+            ("ACCRUAL_TRANSACTIONS", "Accrual transactions"),
+            ("ABSENCE_EXCEPTION", "Absence exceptions"),
+            ("ISR_DAILY", "Include summary report — daily"),
+            ("ISR_SUMMARY", "Include summary report — summary"),
         ]
-        return [SelectElement(value=tok, label=f"{tok} ({section})") for tok, section in groups]
+        return [SelectElement(value=tok, label=label) for tok, label in groups]
 
     @sync_action("list_columns")
     def list_columns(self) -> list[SelectElement]:
