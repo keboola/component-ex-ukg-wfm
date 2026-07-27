@@ -521,20 +521,6 @@
     }
   },
   {
-    "name": "31_listTimecardMetrics",
-    "description": "Sync action list_timecard_metrics: the curated metric-group picker (select tokens) for the timecard_metrics resource.",
-    "config": {
-      "action": "list_timecard_metrics",
-      "parameters": {
-        "host": "https://acme.prd.mykronos.com",
-        "client_id": "DUMMY_CLIENT_ID",
-        "#client_secret": "DUMMY_CLIENT_SECRET",
-        "username": "DUMMY_USER",
-        "#password": "DUMMY_PASSWORD"
-      }
-    }
-  },
-  {
     "name": "32_timecard_metrics_selected_actual_totals",
     "description": "timecard_metrics with metric_groups=[ACTUAL_TOTALS] (the picker field): proves the picked group folds into the API select so the response is ONLY actualTotals — targeted, memory-lean.",
     "config": {

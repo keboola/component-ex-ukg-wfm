@@ -36,9 +36,9 @@ class Configuration(BaseModel):
     # we raise the cap. 50000 mirrors the value proven in production for a full-org roster.
     hyperfind_threshold: int = Field(default=50000, ge=1)
     select: list[str] = Field(default_factory=list)
-    # Timecard-metrics-only picker: the API `select` groups chosen via the list_timecard_metrics
-    # dropdown (a separate row-schema field so it shows only for that resource). Folded into the
-    # effective select below; `select` (free-text, other resources) takes precedence if both are set.
+    # Timecard-metrics-only picker: the API `select` groups chosen from the static enum dropdown (a
+    # separate row-schema field so it shows only for that resource). Folded into the effective
+    # select below; `select` (free-text, other resources) takes precedence if both are set.
     metric_groups: list[str] = Field(default_factory=list)
     # User-supplied primary key for the output table. Overrides the resource registry default and,
     # on incremental load, enables upsert even for a registry-keyless resource.
