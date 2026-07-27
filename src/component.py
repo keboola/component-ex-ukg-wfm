@@ -326,6 +326,26 @@ class Component(ComponentBase):
         self.client.get_token()
         return {"status": "success"}
 
+    @sync_action("list_hyperfinds")
+    def list_hyperfinds(self) -> list[SelectElement]:
+        """Populate the Hyperfind Query dropdown from the tenant's saved Hyperfind queries.
+
+        GET /commons/hyperfind lists every query the account can see — public, personal and
+        system ones (the latter carry negative ids, e.g. -9). The value is the numeric id the
+        extraction sends as the employee scope; the label pairs the human name with that id so a
+        user picks by name instead of guessing an id.
+        """
+        result = self.client.get_json("/commons/hyperfind")
+        queries = result.get("hyperfindQueries", []) if isinstance(result, dict) else []
+        elements: list[SelectElement] = []
+        for query in queries:
+            if not isinstance(query, dict) or "id" not in query:
+                continue
+            qid = query["id"]
+            name = query.get("name") or query.get("qualifier") or str(qid)
+            elements.append(SelectElement(value=str(qid), label=f"{name} ({qid})"))
+        return elements
+
     @sync_action("list_columns")
     def list_columns(self) -> list[SelectElement]:
         """Populate the Primary Key dropdown from the resource's output-table columns in Storage.

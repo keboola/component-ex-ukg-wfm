@@ -94,8 +94,17 @@
     "hyperfind_ref": {
       "type": "string",
       "title": "Hyperfind Query",
-      "description": "Hyperfind query id/name that resolves the employee-ID set for this resource. Leave empty to use the tenant's 'All Home' default.",
+      "format": "select",
+      "enum": [],
+      "description": "Employee set this resource is pulled for",
       "options": {
+        "async": {
+          "label": "Load Hyperfinds",
+          "action": "list_hyperfinds",
+          "autoload": true,
+          "cache": true
+        },
+        "tooltip": "The Hyperfind query that resolves which employees this resource extracts. Click Load Hyperfinds and pick from the tenant's saved queries (public, personal, and system). Leave unset to fall back to 'All Home', which large tenants reject above their size threshold — pick a narrower query instead.",
         "dependencies": {
           "resource": [
             "persons",

@@ -88,6 +88,10 @@ Incremental & windowing
   `forwardToken` flag, set once in the Developer Portal by an admin).
 - A **symbolic period** replaces the date window entirely — when set, Start Date / End Date are
   ignored, so configure one or the other, not both.
+- The **Hyperfind Query** field is a dropdown backed by the `list_hyperfinds` sync action, which
+  lists the tenant's saved queries (public, personal, and system — including negative-id system
+  queries); you pick by name and the stored value is the query id. Leave it unset to fall back to
+  "All Home", which large tenants reject above their size threshold.
 
 Payroll async export
 ====================
