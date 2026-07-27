@@ -91,6 +91,19 @@
       },
       "propertyOrder": 40
     },
+    "payroll_query": {
+      "type": "string",
+      "format": "textarea",
+      "title": "Payroll Export Query",
+      "description": "Tenant-defined payroll export query",
+      "propertyOrder": 45,
+      "options": {
+        "tooltip": "The SQL-like query UKG WFM runs for the async payroll export (POST /commons/payroll/export/async). It is tenant-specific — use the export query your WFM tenant defines. Required for the Payroll Export resource.",
+        "dependencies": {
+          "resource": "payroll_export"
+        }
+      }
+    },
     "hyperfind_ref": {
       "type": "string",
       "title": "Hyperfind Query",
@@ -125,8 +138,7 @@
             "attestations",
             "work_activities",
             "work_activity_shifts",
-            "work_activity_net_changes",
-            "payroll_export"
+            "work_activity_net_changes"
           ]
         }
       },
