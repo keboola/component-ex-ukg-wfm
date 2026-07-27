@@ -1,0 +1,24 @@
+{
+  "files": {},
+  "hash_algorithm": "sha256",
+  "tables": {
+    "timekeeping_timecard_metrics.csv": {
+      "columns": [
+        "actualTotals",
+        "employeeId_id",
+        "employeeId_name",
+        "employeeId_qualifier"
+      ],
+      "hash": "sha256:b8c641381ebb1e7b5a0c23f808c1760e05f21cdff53b5b2e829d83d3f62534e1",
+      "row_count": 26,
+      "size_bytes": 290967
+    },
+    "timekeeping_timecard_metrics.csv.manifest": {
+      "columns": null,
+      "hash": "sha256:71adb8a2d90e233e3a22692091153a764f8a9a330878e56ce4e9ad43b26d5803",
+      "row_count": null,
+      "size_bytes": 778
+    }
+  },
+  "version": "1.0"
+}

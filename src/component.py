@@ -372,6 +372,27 @@ class Component(ComponentBase):
             elements.append(SelectElement(value=str(pid), label=label))
         return elements
 
+    @sync_action("list_timecard_metrics")
+    def list_timecard_metrics(self) -> list[SelectElement]:
+        """Populate the metric-group picker for the timecard_metrics resource.
+
+        These are the `select` tokens for POST /timekeeping/timecard_metrics/multi_read — a fixed
+        UKG vocabulary (an unknown token is rejected WFP-90009), so the list is curated in code
+        rather than fetched. Each chosen token maps to one response section (shown in the label).
+        Leaving the field empty makes the API return ALL sections — a much larger payload — so
+        picking only the sections you need also keeps the per-request response within memory.
+        """
+        # (token, response section) pairs — VERIFIED live 200 against the tenant.
+        groups = [
+            ("ACTUAL_TOTALS", "actualTotals"),
+            ("SCHEDULED_TOTALS", "scheduledTotals"),
+            ("PROJECTED_TOTALS", "projectedTotals"),
+            ("TOTALS", "tktotalsData"),
+            ("ACCRUAL_SUMMARY", "accrualSummaryData"),
+            ("ACCRUAL_TRANSACTIONS", "accrualTransactions"),
+        ]
+        return [SelectElement(value=tok, label=f"{tok} ({section})") for tok, section in groups]
+
     @sync_action("list_columns")
     def list_columns(self) -> list[SelectElement]:
         """Populate the Primary Key dropdown from the resource's output-table columns in Storage.
