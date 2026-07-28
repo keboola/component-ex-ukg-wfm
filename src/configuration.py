@@ -72,5 +72,11 @@ class Configuration(BaseModel):
     @computed_field
     @property
     def effective_select(self) -> list[str]:
-        """API `select` groups: the free-text `select` if set, else the timecard-metrics picker."""
-        return self.select or self.metric_groups
+        """API `select` groups. For timecard_metrics the metric-group picker (`metric_groups`) is
+        authoritative — it's that resource's own field and `select` is hidden for it, so a stale or
+        raw-JSON `select` must not override the picker. Empty picker = all sections. Every other
+        resource uses the free-text `select`.
+        """
+        if self.resource == "timekeeping_timecard_metrics":
+            return self.metric_groups
+        return self.select

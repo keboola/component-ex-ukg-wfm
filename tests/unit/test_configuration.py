@@ -41,10 +41,29 @@ def test_effective_select_folds_metric_groups():
     assert cfg.effective_select == ["ACTUAL_TOTALS"]
 
 
-def test_effective_select_prefers_explicit_select():
-    # Free-text select (other resources / power users) wins over the picker if both are set.
+def test_non_metrics_resource_uses_free_text_select():
+    # Every non-metrics resource uses the free-text `select`; metric_groups is irrelevant there.
     cfg = Configuration(**_root(), resource="persons", select=["FOO"], metric_groups=["ACTUAL_TOTALS"])
     assert cfg.effective_select == ["FOO"]
+
+
+def test_metric_groups_wins_over_stale_select_for_timecard_metrics():
+    # Regression: a stale/hidden `select` on the timecard_metrics row must NOT override the picker.
+    cfg = Configuration(
+        **_root(),
+        resource="timekeeping_timecard_metrics",
+        select=["SCHEDULED_TOTALS", "PROJECTED_TOTALS"],  # stale leftover, hidden for this resource
+        metric_groups=["ACTUAL_TOTALS"],
+    )
+    assert cfg.effective_select == ["ACTUAL_TOTALS"]
+
+
+def test_empty_metric_groups_means_all_sections_ignoring_stale_select():
+    # Empty picker on timecard_metrics = all sections; a stale `select` must not leak back in.
+    cfg = Configuration(
+        **_root(), resource="timekeeping_timecard_metrics", select=["SCHEDULED_TOTALS"], metric_groups=[]
+    )
+    assert cfg.effective_select == []
 
 
 def test_effective_select_empty_by_default():
