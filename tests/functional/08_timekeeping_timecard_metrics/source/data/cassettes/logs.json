@@ -5,12 +5,6 @@
     {
       "level": "INFO",
       "logger": "root",
-      "message": "Loading state file..",
-      "timestamp": "2026-07-27T17:27:35.000Z"
-    },
-    {
-      "level": "INFO",
-      "logger": "root",
       "message": "Obtained UKG WFM OAuth token (expires in 1799s).",
       "timestamp": "2026-07-27T17:27:35.000Z"
     },

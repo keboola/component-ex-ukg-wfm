@@ -2,7 +2,6 @@ import csv
 import logging
 import tempfile
 from collections.abc import Iterator
-from datetime import UTC, datetime
 from typing import Any
 
 from keboola.component.base import ComponentBase, sync_action
@@ -22,7 +21,7 @@ from client.resources import (
 from client.storage import default_output_table_id, get_table_columns
 from client.transform import flatten_record
 from client.wfm_client import WfmClient
-from client.window import STATE_LAST_RUN, resolve_window
+from client.window import resolve_window
 from configuration import Configuration
 
 # Baseline recording sanitizer: DefaultSanitizer strips the Authorization header and the known
@@ -177,37 +176,36 @@ class Component(ComponentBase):
         if self._config.resource is None:
             raise UserException("'resource' is required. Configure a resource row.")
         resource = get_resource(self._config.resource)
-        state = self.get_state_file() or {}
-        since_iso, until_iso, watermark = self._compute_window(resource, state)
+        since_iso, until_iso = self._compute_window(resource)
         record_iter = self._record_source(resource, since_iso, until_iso)
         row_count, columns = self._stream_and_write_table(resource, record_iter)
-        if row_count == 0:
-            logging.info("No rows returned for resource '%s'; skipping table write.", resource.name)
-        if self._effective_incremental(resource):
-            # Advance watermark even on empty result to prevent unbounded window growth.
-            self.write_state_file({STATE_LAST_RUN: watermark})
         if row_count:
             logging.info("Extracted resource '%s': %s rows, %s columns.", resource.name, row_count, len(columns))
 
     def _effective_incremental(self, resource: ResourceDef) -> bool:
-        """The one predicate governing watermark, fetch window, and manifest flag (see resources)."""
+        """Predicate governing the Storage write mode (incremental upsert vs full replace) and the
+        manifest `incremental` flag. The fetch window is independent — config-driven (see resources).
+        """
         return effective_incremental(resource, self._config.incremental, self._config.primary_key)
 
-    def _compute_window(self, resource: ResourceDef, state: dict[str, Any]) -> tuple[str | None, str | None, str]:
-        """Return (since_iso, until_iso, watermark_iso) — the third value is the next-run watermark."""
-        # A symbolic period replaces the date window; skip window and watermark logic.
-        if self._config.symbolic_period:
-            return None, None, datetime.now(UTC).isoformat()
-        date_field = resource.date_field
-        if not date_field:
-            return None, None, datetime.now(UTC).isoformat()
-        return resolve_window(
-            state,
-            date_field,
-            self._config.since,
-            self._effective_incremental(resource),
-            self._config.until,
-        )
+    def _compute_window(self, resource: ResourceDef) -> tuple[str | None, str | None]:
+        """Return (since_iso, until_iso) — the fetch window, driven purely by Start/End Date config.
+
+        There is no state watermark: the window is recomputed from config every run. A symbolic
+        period replaces the date window, and a resource with no date field has no window at all.
+        """
+        if self._config.symbolic_period or not resource.date_field:
+            return None, None
+        since_iso, until_iso = resolve_window(self._config.since, self._config.until)
+        if since_iso and until_iso and since_iso >= until_iso:
+            logging.warning(
+                "Fetch window for resource '%s' is empty: Start Date %s is not before End Date %s; "
+                "no rows will be returned.",
+                resource.name,
+                since_iso,
+                until_iso,
+            )
+        return since_iso, until_iso
 
     def _record_source(
         self, resource: ResourceDef, since_iso: str | None, until_iso: str | None
@@ -280,7 +278,7 @@ class Component(ComponentBase):
                 row_count += 1
 
             if row_count == 0:
-                return 0, []
+                return self._write_empty_table(resource)
 
             # Phase 2: sorted columns → deterministic manifest schema across incremental runs.
             # Effective PK = the user-supplied primary_key if set, else the resource registry default.
@@ -298,8 +296,8 @@ class Component(ComponentBase):
                 )
                 for col in columns
             }
-            # Same predicate as the watermark and window logic: incremental append/upsert
-            # only with a stable PK; a keyless resource with no user PK always full-REPLACEs.
+            # Storage write mode: incremental upsert only with a stable PK; a keyless resource
+            # with no user PK always full-REPLACEs.
             is_incremental = self._effective_incremental(resource)
             table = self.create_out_table_definition(
                 f"{resource.name}.csv",
@@ -322,6 +320,50 @@ class Component(ComponentBase):
 
         self.write_manifest(table)
         return row_count, columns
+
+    def _write_empty_table(self, resource: ResourceDef) -> tuple[int, list[str]]:
+        """Write a header-only output table when a run yields no rows.
+
+        A full load that returns nothing must still replace its destination (the Load Type help
+        says full load "replaces it each run"), and a first run should leave an empty table that
+        downstream configs can bind to rather than nothing at all. The header is derived from the
+        effective primary key. A keyless resource has no schema to emit, so there we can only warn
+        that the destination's previous contents were kept.
+        """
+        primary_key = effective_primary_key(resource, self._config.primary_key)
+        if not primary_key:
+            logging.info(
+                "No rows returned for resource '%s' and no primary key to build a header from; "
+                "leaving the output table unwritten (a full load keeps its previous contents).",
+                resource.name,
+            )
+            return 0, []
+        schema = {
+            col: ColumnDefinition(
+                data_types=BaseType(
+                    dtype=(SupportedDataTypes.TIMESTAMP if col in _TIMESTAMP_FIELDS else SupportedDataTypes.STRING)
+                ),
+                nullable=False,
+                primary_key=True,
+            )
+            for col in primary_key
+        }
+        table = self.create_out_table_definition(
+            f"{resource.name}.csv",
+            primary_key=primary_key,
+            incremental=self._effective_incremental(resource),
+            has_header=True,
+            schema=schema,
+        )
+        with open(table.full_path, "w", encoding="utf-8", newline="") as fh:
+            csv.DictWriter(fh, fieldnames=primary_key).writeheader()
+        self.write_manifest(table)
+        logging.info(
+            "No rows returned for resource '%s'; wrote a header-only table with columns %s.",
+            resource.name,
+            ", ".join(primary_key),
+        )
+        return 0, primary_key
 
     @sync_action("testConnection")
     def test_connection(self) -> dict[str, str]:

@@ -64,28 +64,30 @@ Supported resources
 Incremental & windowing
 =======================
 
-- Incremental resources store the last window end in per-row `state.json`; the next run reads
-  `[last_end, now]`.
-- **Start Date (`since`)** bounds the API fetch and is independent of the load type. It seeds the
-  first run of a primary-key resource on incremental load (state watermark takes over afterwards),
-  and is applied on every run for full load and for keyless resources.
-- **End Date (`until`)** optionally bounds the upper end of the fetch window (empty = the current
-  run time); when set it also becomes the persisted watermark so the next run continues from there.
+- The **fetch window is driven purely by Start Date / End Date** and is recomputed from the
+  configuration on every run — there is no persisted state watermark. **Load Type controls only how
+  Storage is written** (full replace vs incremental upsert), never how much data is fetched.
+- **Start Date (`since`)** is the lower bound of the API fetch, applied on every run. Leave it empty
+  for an unbounded lower bound.
+- **End Date (`until`)** optionally bounds the upper end (empty = the current run time). Because there
+  is no watermark, an absolute End Date simply fetches the same `[since, until]` window each run; an
+  empty window (Start Date not before End Date) is logged as a warning.
 - The window is split into **≤365-day sub-windows** to respect service limits; employee sets are
   chunked by each resource's per-call batch limit (≤500 for most, 100 for persons, 50 for activity
   net-changes) and adaptively **halved on HTTP 413**.
 - Net-change resources currently run as a date-windowed full **replace** (like other keyless
-  resources); true net-change delta is deferred until a resource gains a stable primary key and
-  persisted change-token.
-- For effectively-incremental resources the watermark advances **even on an empty result** to prevent
-  unbounded window growth.
-- **Incremental requires a primary key.** A resource upserts incrementally only when a primary key
-  exists — either its registry default or one supplied via the row's `primary_key` field. A
+  resources); true net-change delta is deferred until a resource gains a stable primary key.
+- A run that returns **no rows** writes a header-only table when the resource has a primary key (so a
+  full load still replaces its destination and downstream configs can bind to it); a keyless resource
+  logs that its previous contents were kept.
+- **Incremental upsert requires a primary key.** A resource upserts incrementally only when a primary
+  key exists — either its registry default or one supplied via the row's `primary_key` field. A
   registry-keyless resource with no user-supplied `primary_key` always runs full-replace
-  (incremental-without-PK would append unboundedly). The `primary_key` UI field is a Storage-backed
-  column picker: the `list_columns` sync action reads the resource's output table from Storage, so it
-  is populated only after the first run has created that table (requires the component's
-  `forwardToken` flag, set once in the Developer Portal by an admin).
+  (incremental-without-PK would append unboundedly). The `primary_key` UI field offers a
+  Storage-backed column picker (the `list_columns` sync action reads the resource's output table,
+  populated after the first run, and requires the component's `forwardToken` flag); you can also
+  **type the column names directly** when the picker cannot resolve them — before the first run, on a
+  dev branch, or with a custom output bucket.
 - A **symbolic period** replaces the date window entirely — when set, Start Date / End Date are
   ignored, so configure one or the other, not both. It is a dropdown backed by the
   `list_symbolic_periods` sync action; you pick a period by name and the stored value is its numeric

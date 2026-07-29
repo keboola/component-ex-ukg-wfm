@@ -1,6 +1,6 @@
 from datetime import UTC, datetime, timedelta
 
-from client.window import compute_window, parse_since, split_date_windows
+from client.window import parse_since, resolve_window, split_date_windows
 
 
 def test_parse_since_naive_iso_is_normalized_to_utc():
@@ -17,7 +17,7 @@ def test_parse_since_keeps_explicit_offset():
 
 def test_parse_since_converts_nonutc_offset_to_utc():
     # A non-UTC offset must be converted to UTC (same instant), not passed through — so request
-    # params and persisted watermarks use one canonical representation.
+    # params use one canonical representation.
     result = parse_since("2026-01-01T00:00:00+02:00")
     assert result.utcoffset() == timedelta(0)
     assert result == datetime(2025, 12, 31, 22, 0, tzinfo=UTC)
@@ -41,25 +41,29 @@ def test_split_over_max_chunks_by_max_days():
         assert prev[1] == nxt[0]
 
 
-def test_compute_window_first_run_uses_since():
-    params, run_started = compute_window({}, "start", "2026-01-01T00:00:00+00:00")
-    assert params["start_since"] == "2026-01-01T00:00:00+00:00"
-    assert "start_until" in params
-    assert run_started
+def test_resolve_window_uses_since_and_until_verbatim():
+    since_iso, until_iso = resolve_window("2026-01-01T00:00:00+00:00", "2026-02-01T00:00:00+00:00")
+    assert since_iso == "2026-01-01T00:00:00+00:00"
+    assert until_iso == "2026-02-01T00:00:00+00:00"
 
 
-def test_compute_window_end_date_bounds_upper_and_watermark():
-    # An explicit End Date (`until`) sets the upper bound AND becomes the persisted watermark,
-    # so the next run continues from there rather than from "now".
-    params, watermark = compute_window({}, "start", "2026-01-01T00:00:00+00:00", until="2026-02-01T00:00:00+00:00")
-    assert params["start_since"] == "2026-01-01T00:00:00+00:00"
-    assert params["start_until"] == "2026-02-01T00:00:00+00:00"
-    assert watermark == "2026-02-01T00:00:00+00:00"
-
-
-def test_compute_window_no_end_date_defaults_upper_to_now():
+def test_resolve_window_no_until_defaults_upper_to_now():
     before = datetime.now(UTC)
-    params, watermark = compute_window({}, "start", None)
-    upper = datetime.fromisoformat(params["start_until"])
-    assert upper >= before  # upper bound is the run start (now)
-    assert watermark == params["start_until"]
+    since_iso, until_iso = resolve_window("2026-01-01T00:00:00+00:00", None)
+    assert since_iso == "2026-01-01T00:00:00+00:00"
+    assert datetime.fromisoformat(until_iso) >= before  # upper bound is the run start (now)
+
+
+def test_resolve_window_no_since_is_unbounded_lower():
+    since_iso, until_iso = resolve_window(None, "2026-02-01T00:00:00+00:00")
+    assert since_iso is None
+    assert until_iso == "2026-02-01T00:00:00+00:00"
+
+
+def test_resolve_window_is_stateless_end_date_does_not_freeze():
+    # Regression for the watermark-freeze bug: with an absolute End Date the window is identical on
+    # every run — there is no persisted watermark to collapse it to an empty [End, End] window.
+    first = resolve_window("2026-01-01T00:00:00+00:00", "2026-06-01T00:00:00+00:00")
+    second = resolve_window("2026-01-01T00:00:00+00:00", "2026-06-01T00:00:00+00:00")
+    assert first == second
+    assert first == ("2026-01-01T00:00:00+00:00", "2026-06-01T00:00:00+00:00")

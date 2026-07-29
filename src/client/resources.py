@@ -527,17 +527,17 @@ def effective_primary_key(resource: ResourceDef, config_pk: list[str] | None = N
 
 
 def effective_incremental(resource: ResourceDef, incremental_load: bool, config_pk: list[str] | None = None) -> bool:
-    """Single source of truth for whether a run is *effectively* incremental.
+    """Single source of truth for whether a run writes to Storage *incrementally*.
 
-    A run behaves incrementally (append/upsert with PK dedup, a state watermark, and
-    a [last_run, now] window) ONLY when the user selected incremental_load AND there is a
-    stable primary key to upsert against — either the resource registry default OR a
-    user-supplied `primary_key`.
+    A run upserts (append + PK dedup, manifest `incremental=True`) ONLY when the user selected
+    incremental_load AND there is a stable primary key to upsert against — either the resource
+    registry default OR a user-supplied `primary_key`.
 
-    Without any PK, an incremental append would duplicate rows unboundedly, so such a
-    resource must run as a full REPLACE every run (case-2 full refresh) regardless of
-    the configured load type. This one predicate governs all three of: reading/advancing
-    the state watermark, computing the fetch window, and the manifest `incremental` flag.
-    They must never disagree.
+    Without any PK, an incremental append would duplicate rows unboundedly, so such a resource
+    must run as a full REPLACE every run regardless of the configured load type.
+
+    This governs the Storage write mode and the manifest `incremental` flag only. The fetch window
+    is independent: it is driven purely by the Start/End Date config (see window.resolve_window) and
+    recomputed on every run — there is no state watermark.
     """
     return incremental_load and bool(effective_primary_key(resource, config_pk))

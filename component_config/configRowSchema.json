@@ -147,10 +147,9 @@
       "type": "integer",
       "title": "Hyperfind Threshold",
       "description": "Maximum number of employees the Hyperfind Query above may resolve before the request is rejected.",
-      "default": 50000,
       "minimum": 1,
       "options": {
-        "tooltip": "UKG rejects a Hyperfind that resolves more employees than this cap with error WCO-112003. UKG's per-request default is low, so a broad Hyperfind ('All Home'/'All People') fails unless it is raised. Leave at 50000 unless your tenant roster is larger, or you want to cap the roster deliberately.",
+        "tooltip": "UKG rejects a Hyperfind that resolves more employees than this cap with error WCO-112003. UKG's per-request default is low, so a broad Hyperfind ('All Home'/'All People') fails unless it is raised. If left empty, the component applies 50000 — raise it only if your tenant roster is larger, or lower it to cap the roster deliberately.",
         "dependencies": {
           "resource": [
             "timekeeping_punches",
@@ -312,7 +311,7 @@
     "primary_key": {
       "type": "array",
       "title": "Primary Key",
-      "description": "Column(s) that uniquely identify a row; used to upsert on incremental load. The dropdown lists the resource's output-table columns from Storage, so it is populated only after the first run has created the table — run once, then click Re-load.",
+      "description": "Column(s) that uniquely identify a row; used to upsert on incremental load. Pick from the dropdown, or type column name(s) directly if the picker can't resolve them.",
       "format": "select",
       "uniqueItems": true,
       "items": {
@@ -324,10 +323,11 @@
           "label": "Re-load Columns from Storage",
           "action": "list_columns"
         },
+        "creatable": true,
         "dependencies": {
           "load_type": "incremental_load"
         },
-        "tooltip": "The output table's primary key. On incremental load the component upserts on these columns and writes the manifest incrementally. Columns are read from the resource's output table in Storage, so this is empty until the first extraction has created that table — run once, then re-load. Supplying a primary key also enables incremental upsert for a resource that has no key in the built-in registry. Leave empty to use the resource's registry default (a keyless resource then stays full-replace)."
+        "tooltip": "The output table's primary key. On incremental load the component upserts on these columns and writes the manifest incrementally. Columns are read from the resource's output table in Storage, so the dropdown is empty until the first extraction has created that table — run once, then re-load. You can also type the column name(s) directly when the picker can't resolve them: before the first run, on a dev branch, or with a custom output-bucket table mapping. Supplying a primary key also enables incremental upsert for a resource that has no key in the built-in registry. Leave empty to use the resource's registry default (a keyless resource then stays full-replace)."
       },
       "propertyOrder": 80
     },
@@ -335,9 +335,9 @@
       "type": "integer",
       "title": "Payroll Max Wait (seconds)",
       "description": "Maximum time to poll a Payroll async export before failing (avoids hanging).",
-      "default": 1800,
       "minimum": 1,
       "options": {
+        "tooltip": "If left empty, the component waits up to 1800 seconds (30 minutes) before failing the poll.",
         "dependencies": {
           "resource": "payroll_export"
         }
@@ -348,9 +348,9 @@
       "type": "integer",
       "title": "Payroll Poll Interval (seconds)",
       "description": "Seconds between Payroll async export status polls.",
-      "default": 15,
       "minimum": 1,
       "options": {
+        "tooltip": "If left empty, the component polls every 15 seconds.",
         "dependencies": {
           "resource": "payroll_export"
         }
