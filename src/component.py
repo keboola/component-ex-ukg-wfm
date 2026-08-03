@@ -160,6 +160,15 @@ _TIMESTAMP_FIELDS = {
 }
 
 
+def _alphabetized(elements: list[SelectElement]) -> list[SelectElement]:
+    """Order dropdown options case-insensitively by their visible label.
+
+    UI convention: a select the user scans (Hyperfinds, output columns, …) is sorted A→Z so an
+    option is findable, rather than left in API/Storage response order.
+    """
+    return sorted(elements, key=lambda e: (e.label or "").casefold())
+
+
 class Component(ComponentBase):
     def __init__(self) -> None:
         super().__init__()
@@ -388,7 +397,7 @@ class Component(ComponentBase):
             qid = query["id"]
             name = query.get("name") or query.get("qualifier") or str(qid)
             elements.append(SelectElement(value=str(qid), label=f"{name} ({qid})"))
-        return elements
+        return _alphabetized(elements)
 
     @sync_action("list_symbolic_periods")
     def list_symbolic_periods(self) -> list[SelectElement]:
@@ -402,15 +411,20 @@ class Component(ComponentBase):
         """
         result = self.client.get_json("/commons/symbolicperiod")
         periods = result if isinstance(result, list) else []
+
+        def _name(p: dict[str, Any]) -> str:
+            return str(p.get("name") or p.get("symbolicId") or p.get("id"))
+
+        # Group by period type (names repeat across types), then A→Z by name so the list is
+        # scannable; sortOrder only breaks exact-name ties, keeping the order deterministic.
         elements: list[SelectElement] = []
         for period in sorted(
             (p for p in periods if isinstance(p, dict) and "id" in p),
-            key=lambda p: (str(p.get("periodTypeId") or ""), p.get("sortOrder") or 0),
+            key=lambda p: (str(p.get("periodTypeId") or ""), _name(p).casefold(), p.get("sortOrder") or 0),
         ):
             pid = period["id"]
-            name = period.get("name") or period.get("symbolicId") or str(pid)
             ptype = period.get("periodTypeId")
-            label = f"{name} [{ptype}]" if ptype else str(name)
+            label = f"{_name(period)} [{ptype}]" if ptype else _name(period)
             elements.append(SelectElement(value=str(pid), label=label))
         return elements
 
@@ -445,7 +459,7 @@ class Component(ComponentBase):
                 "default output bucket, so a dev branch or a custom output-bucket mapping is not supported "
                 "— set the primary key manually in that case."
             )
-        return [SelectElement(value=col, label=col) for col in columns]
+        return _alphabetized([SelectElement(value=col, label=col) for col in columns])
 
 
 if __name__ == "__main__":

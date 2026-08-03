@@ -6,35 +6,41 @@
     "host": {
       "type": "string",
       "title": "Tenant Host URL",
-      "description": "Full tenant vanity URL, e.g. https://acme.prd.mykronos.com (no trailing path).",
+      "description": "Your UKG tenant sign-in URL, with no trailing path",
+      "options": {
+        "inputAttributes": {
+          "placeholder": "https://mycompany.prd.mykronos.com"
+        },
+        "tooltip": "The base vanity URL you use to sign in to UKG Pro WFM — the host only, nothing after the domain. Example: `https://mycompany.prd.mykronos.com`."
+      },
       "propertyOrder": 10
     },
     "#client_id": {
       "type": "string",
       "format": "password",
       "title": "Client ID",
-      "description": "OAuth client id minted by UKG at tenant provisioning.",
+      "description": "OAuth client id issued by UKG when your tenant is set up.",
       "propertyOrder": 20
     },
     "#client_secret": {
       "type": "string",
       "format": "password",
       "title": "Client Secret",
-      "description": "OAuth client secret minted by UKG at tenant provisioning.",
+      "description": "OAuth client secret issued by UKG when your tenant is set up.",
       "propertyOrder": 30
     },
     "#username": {
       "type": "string",
       "format": "password",
       "title": "Service Account Username",
-      "description": "Username of the dedicated WFM service account (password grant).",
+      "description": "Username of the dedicated UKG service account this extractor signs in as.",
       "propertyOrder": 40
     },
     "#password": {
       "type": "string",
       "format": "password",
       "title": "Service Account Password",
-      "description": "Password of the dedicated WFM service account.",
+      "description": "Password of that UKG service account.",
       "propertyOrder": 50
     },
     "test_connection": {

@@ -31,18 +31,23 @@ EXPECTED_FAMILIES = {
 }
 
 
-def test_row_schema_resource_enum_equals_registry_keys():
-    """Gate: the configRowSchema `resource` enum must EXACTLY match the registry keys (same set
-    and order), and enum_titles must stay index-aligned. Skipped where component_config/ is not
-    checked out (the runtime Docker image ships only src/scripts/tests, not portal metadata)."""
+def test_row_schema_resource_enum_matches_registry_and_is_alphabetical():
+    """Gate: the configRowSchema `resource` dropdown must offer EXACTLY the registry's resources
+    (no drift), stay index-aligned with enum_titles, and be sorted A→Z by its visible label.
+
+    Display order is a UI concern, so it is decoupled from the registry's (curated) order and
+    compared as a set. The A→Z ordering is the UI convention that a select is scannable. Skipped
+    where component_config/ is not checked out (the runtime Docker image ships only
+    src/scripts/tests, not portal metadata)."""
     if not _ROW_SCHEMA.exists():
         pytest.skip("component_config/configRowSchema.json not present in this environment")
     schema = json.loads(_ROW_SCHEMA.read_text())
     resource_prop = schema["properties"]["resource"]
     enum = resource_prop["enum"]
     titles = resource_prop["options"]["enum_titles"]
-    assert enum == list(RESOURCE_REGISTRY.keys())
+    assert set(enum) == set(RESOURCE_REGISTRY.keys())
     assert len(titles) == len(enum)
+    assert titles == sorted(titles, key=str.casefold)
 
 
 def test_dropped_resources_absent():

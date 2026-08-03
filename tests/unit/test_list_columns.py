@@ -68,5 +68,6 @@ def test_returns_select_elements(monkeypatch):
         component_module, "get_table_columns", lambda url, token, table_id: ["personNumber", "firstName"]
     )
     result = _raw(_comp())
-    assert [e.value for e in result] == ["personNumber", "firstName"]
+    # Columns are returned alphabetized (case-insensitive) so the PK picker is scannable.
+    assert [e.value for e in result] == ["firstName", "personNumber"]
     assert all(e.label == e.value for e in result)
