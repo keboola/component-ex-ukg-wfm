@@ -14,8 +14,8 @@ Overview
 ========
 
 One configuration row = one resource. The global configuration holds authentication; each row
-selects a resource plus load type, date window / symbolic period, Hyperfind employee scope, and
-select fields. Rows stream to one output table per resource with a native-type manifest.
+selects a resource plus load type, date window / symbolic period, and Hyperfind employee scope.
+Rows stream to one output table per resource with a native-type manifest.
 
 Authentication & provisioning
 ==============================

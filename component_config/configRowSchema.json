@@ -175,41 +175,6 @@
       },
       "propertyOrder": 55
     },
-    "select": {
-      "type": "array",
-      "title": "Select Fields",
-      "description": "Optional list of API 'select' elements to request. Leave empty to use the resource default.",
-      "items": {
-        "type": "string"
-      },
-      "options": {
-        "tooltip": "Type the API field name(s) to select directly, one per item. Leave empty to use the resource default.",
-        "dependencies": {
-          "resource": [
-            "persons",
-            "timekeeping_punches",
-            "timekeeping_timecards",
-            "scheduling_schedules",
-            "scheduling_shifts",
-            "scheduling_open_shifts",
-            "scheduling_swaps",
-            "accruals_balances",
-            "accruals_transactions",
-            "accruals_summaries",
-            "leave_cases",
-            "leave_edits",
-            "attendance_records",
-            "attendance_events",
-            "attestations",
-            "work_activities",
-            "work_activity_shifts",
-            "work_activity_net_changes",
-            "payroll_export"
-          ]
-        }
-      },
-      "propertyOrder": 60
-    },
     "metric_groups": {
       "type": "array",
       "title": "Timecard Metric Groups",

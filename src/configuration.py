@@ -35,10 +35,14 @@ class Configuration(BaseModel):
     # UKG's per-request default is low, so a broad Hyperfind ("All Home"/"All People") 400s unless
     # we raise the cap. 50000 mirrors the value proven in production for a full-org roster.
     hyperfind_threshold: int = Field(default=50000, ge=1)
+    # Advanced API `select` passthrough (the fields / metric tokens a resource requests). No longer
+    # exposed in the config UI: it was undocumented, and where a resource's registry default is
+    # load-bearing (accruals, attestations, work / net-change) a user override silently broke the
+    # read. Kept for back-compat / raw-JSON power users; empty = the resource's registry default.
     select: list[str] = Field(default_factory=list)
     # Timecard-metrics-only picker: the API `select` groups chosen from the static enum dropdown (a
-    # separate row-schema field so it shows only for that resource). Folded into the effective
-    # select below; `select` (free-text, other resources) takes precedence if both are set.
+    # separate row-schema field so it shows only for that resource). Folded into the effective select
+    # below; for timecard_metrics `metric_groups` is authoritative (any `select` is ignored).
     metric_groups: list[str] = Field(default_factory=list)
     # User-supplied primary key for the output table. Overrides the resource registry default and,
     # on incremental load, enables upsert even for a registry-keyless resource.
@@ -73,9 +77,9 @@ class Configuration(BaseModel):
     @property
     def effective_select(self) -> list[str]:
         """API `select` groups. For timecard_metrics the metric-group picker (`metric_groups`) is
-        authoritative — it's that resource's own field and `select` is hidden for it, so a stale or
-        raw-JSON `select` must not override the picker. Empty picker = all sections. Every other
-        resource uses the free-text `select`.
+        authoritative, so a stale or raw-JSON `select` must not override it. Empty picker = all
+        sections. Every other resource falls back to `select` (no longer a UI field; empty for
+        UI-built configs, so the resource's registry default applies).
         """
         if self.resource == "timekeeping_timecard_metrics":
             return self.metric_groups
