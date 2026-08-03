@@ -203,7 +203,7 @@ class Component(ComponentBase):
         There is no state watermark: the window is recomputed from config every run. A symbolic
         period replaces the date window, and a resource with no date field has no window at all.
         """
-        if self._config.symbolic_period or not resource.date_field:
+        if self._config.effective_symbolic_period or not resource.date_field:
             return None, None
         since_iso, until_iso = resolve_window(self._config.since, self._config.until)
         if since_iso and until_iso and since_iso >= until_iso:
@@ -237,7 +237,7 @@ class Component(ComponentBase):
             since_iso=since_iso,
             until_iso=until_iso,
             select=self._config.effective_select,
-            symbolic_period=self._config.symbolic_period,
+            symbolic_period=self._config.effective_symbolic_period,
             page_size=self._config.page_size,
             max_pages=self._config.max_pages,
             hyperfind_threshold=self._config.hyperfind_threshold,

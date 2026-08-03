@@ -26,6 +26,12 @@ class Configuration(BaseModel):
     since: str | None = None
     # Optional upper bound of the fetch window; empty = now (run start).
     until: str | None = None
+    # UI discriminator for how the fetch window is chosen: "date_window" (Start/End Date) or
+    # "symbolic_period" (a rolling UKG period). It gates which fields the form shows AND is
+    # authoritative in code (see effective_symbolic_period) so a hidden, stale symbolic_period value
+    # can't drive a run. None = a pre-window_type config; the legacy "symbolic_period presence wins"
+    # rule then applies, preserving existing configs.
+    window_type: str | None = None
     # Numeric symbolic-period id (as a string, e.g. "1" = Current Pay Period) from
     # GET /commons/symbolicperiod — a rolling window that replaces since/until. Pick it with the
     # Symbolic Period dropdown; WFM rejects a qualifier name (WTK-147500). Empty = use since/until.
@@ -72,6 +78,19 @@ class Configuration(BaseModel):
     @property
     def incremental(self) -> bool:
         return self.load_type == LoadType.INCREMENTAL
+
+    @computed_field
+    @property
+    def effective_symbolic_period(self) -> str | None:
+        """The symbolic period that actually drives the run, honoring the window_type mode picker.
+
+        `window_type` is authoritative: in "date_window" mode a stale/hidden `symbolic_period` value
+        is ignored (returns None → the Start/End window applies). A pre-window_type config
+        (window_type is None) keeps the legacy behaviour where a set `symbolic_period` wins.
+        """
+        if self.window_type == "date_window":
+            return None
+        return self.symbolic_period or None
 
     @computed_field
     @property

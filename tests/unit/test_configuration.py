@@ -69,3 +69,28 @@ def test_empty_metric_groups_means_all_sections_ignoring_stale_select():
 def test_effective_select_empty_by_default():
     cfg = Configuration(**_root(), resource="persons")
     assert cfg.effective_select == []
+
+
+def test_window_type_date_ignores_stale_symbolic_period():
+    # The mode picker is authoritative: in date_window mode a hidden/stale symbolic_period value
+    # must NOT drive the run — it resolves to None so the Start/End window applies.
+    cfg = Configuration(**_root(), resource="persons", window_type="date_window", symbolic_period="1")
+    assert cfg.effective_symbolic_period is None
+
+
+def test_window_type_symbolic_uses_symbolic_period():
+    cfg = Configuration(**_root(), resource="persons", window_type="symbolic_period", symbolic_period="1")
+    assert cfg.effective_symbolic_period == "1"
+
+
+def test_legacy_config_without_window_type_keeps_symbolic_period():
+    # Back-compat: a pre-window_type config (window_type absent → None) still honors a set
+    # symbolic_period, so existing configs are unchanged.
+    cfg = Configuration(**_root(), resource="persons", symbolic_period="1")
+    assert cfg.window_type is None
+    assert cfg.effective_symbolic_period == "1"
+
+
+def test_symbolic_mode_without_a_period_resolves_to_none():
+    cfg = Configuration(**_root(), resource="persons", window_type="symbolic_period")
+    assert cfg.effective_symbolic_period is None

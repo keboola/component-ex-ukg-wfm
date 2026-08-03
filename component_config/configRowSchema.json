@@ -61,6 +61,18 @@
       },
       "propertyOrder": 10
     },
+    "window_type": {
+      "type": "string",
+      "title": "Date Selection",
+      "description": "Choose the fetch window by explicit dates or by a rolling symbolic period",
+      "enum": ["date_window", "symbolic_period"],
+      "default": "date_window",
+      "options": {
+        "enum_titles": ["Date range (Start / End)", "Symbolic period"],
+        "tooltip": "Date range: set an explicit Start Date / End Date window. Symbolic period: use a UKG rolling period (e.g. Current Pay Period) that resolves the range for you. Symbolic periods are not supported for scheduling resources — use a date range there."
+      },
+      "propertyOrder": 20
+    },
     "load_type": {
       "type": "string",
       "title": "Load Type",
@@ -71,14 +83,17 @@
       },
       "enum": ["full_load", "incremental_load"],
       "default": "incremental_load",
-      "propertyOrder": 20
+      "propertyOrder": 75
     },
     "since": {
       "type": "string",
       "title": "Start Date",
       "description": "Lower bound of the fetch window",
       "options": {
-        "tooltip": "ISO 8601 (e.g. `2026-01-01T00:00:00+00:00`) or a relative phrase (e.g. `30 days ago`, `yesterday`). Applied on every run as the lower bound of the fetch window — Load Type only changes how rows are written to Storage, not which data is fetched. Ignored when a Symbolic Period is set (the period defines the range instead)."
+        "tooltip": "ISO 8601 (e.g. `2026-01-01T00:00:00+00:00`) or a relative phrase (e.g. `30 days ago`, `yesterday`). Applied on every run as the lower bound of the fetch window — Load Type only changes how rows are written to Storage, not which data is fetched.",
+        "dependencies": {
+          "window_type": "date_window"
+        }
       },
       "propertyOrder": 30
     },
@@ -87,7 +102,10 @@
       "title": "End Date",
       "description": "Upper bound of the fetch window",
       "options": {
-        "tooltip": "Optional. ISO 8601 (e.g. `2026-02-01T00:00:00+00:00`) or a relative phrase (e.g. `yesterday`, `now`). Leave empty to fetch up to the current run time; set it to bound a backfill to a fixed window. Ignored when a Symbolic Period is set (the period defines the range instead)."
+        "tooltip": "Optional. ISO 8601 (e.g. `2026-02-01T00:00:00+00:00`) or a relative phrase (e.g. `yesterday`, `now`). Leave empty to fetch up to the current run time; set it to bound a backfill to a fixed window.",
+        "dependencies": {
+          "window_type": "date_window"
+        }
       },
       "propertyOrder": 40
     },
@@ -269,14 +287,17 @@
           "autoload": true,
           "cache": true
         },
-        "tooltip": "The UKG-named rolling period range (e.g. `Current Pay Period`, `Previous Pay Period`, `Yesterday`, `Today`) sent to the API instead of an explicit window. Click Load Symbolic Periods and pick from the tenant's periods; the value stored is the numeric id — WFM rejects a period name, only the id works. If set, it takes precedence and Start Date / End Date are ignored — configure EITHER a symbolic period OR an explicit Start/End window, not both. Not supported for scheduling resources (schedule/multi_read rejects a symbolic period) — those require an explicit Start/End date window. Leave empty to use the Start/End date window instead. See the UKG Pro WFM API reference: https://developer.ukg.com/wfm/reference"
+        "tooltip": "The UKG-named rolling period range (e.g. `Current Pay Period`, `Previous Pay Period`, `Yesterday`, `Today`). Click Load Symbolic Periods and pick from the tenant's periods; the value stored is the numeric id — WFM rejects a period name, only the id works. Not supported for scheduling resources (they require a Date range). See the UKG Pro WFM API reference: https://developer.ukg.com/wfm/reference",
+        "dependencies": {
+          "window_type": "symbolic_period"
+        }
       },
-      "propertyOrder": 70
+      "propertyOrder": 42
     },
     "primary_key": {
       "type": "array",
       "title": "Primary Key",
-      "description": "Column(s) that uniquely identify a row; used to upsert on incremental load. Pick from the dropdown, or type column name(s) directly if the picker can't resolve them.",
+      "description": "Column(s) that identify a row for upsert. The API returns no field list, so columns are read from Storage after the first run — run once then Re-load, or type them.",
       "format": "select",
       "uniqueItems": true,
       "items": {
@@ -292,7 +313,7 @@
         "dependencies": {
           "load_type": "incremental_load"
         },
-        "tooltip": "The output table's primary key. On incremental load the component upserts on these columns and writes the manifest incrementally. Columns are read from the resource's output table in Storage, so the dropdown is empty until the first extraction has created that table — run once, then re-load. You can also type the column name(s) directly when the picker can't resolve them: before the first run, on a dev branch, or with a custom output-bucket table mapping. Supplying a primary key also enables incremental upsert for a resource that has no key in the built-in registry. Leave empty to use the resource's registry default (a keyless resource then stays full-replace)."
+        "tooltip": "On incremental load the component upserts on these columns. The WFM API doesn't expose a field list, so the picker reads columns from this resource's output table in Storage — which exists only after the first run. Run once, then click Re-load Columns from Storage; or type the column name(s) directly (before the first run, on a dev branch, or with a custom output bucket). Supplying a key also enables upsert for a resource with no registry default. Empty = the resource's registry default."
       },
       "propertyOrder": 80
     },
