@@ -445,7 +445,10 @@ class Component(ComponentBase):
                 "column picker can read the output table."
             )
         if not env.component_id or not env.config_id:
-            raise UserException("Component/configuration id is unavailable; cannot locate the output table.")
+            raise UserException(
+                "Column auto-loading isn't available until this configuration is saved and has run once. "
+                "For now, type the primary-key column name(s) directly into the field."
+            )
         resource = get_resource(self._config.resource)
         table_id = default_output_table_id(env.component_id, env.config_id, resource.name)
         try:

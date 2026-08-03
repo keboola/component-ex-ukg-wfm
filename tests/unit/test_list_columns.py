@@ -41,7 +41,7 @@ def test_requires_forwarded_token():
 
 
 def test_requires_component_and_config_id():
-    with pytest.raises(UserException, match="Component/configuration id"):
+    with pytest.raises(UserException, match="saved and has run once"):
         _raw(_comp(config_id=None))
 
 
