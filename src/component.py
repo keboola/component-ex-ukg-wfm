@@ -170,6 +170,9 @@ def _alphabetized(elements: list[SelectElement]) -> list[SelectElement]:
 
 
 class Component(ComponentBase):
+    # state.json key holding the sticky per-resource column set (see _load_sticky_columns).
+    _STATE_COLUMNS_KEY = "schema_columns"
+
     def __init__(self) -> None:
         super().__init__()
         self._config = Configuration(**self.configuration.parameters)
@@ -196,6 +199,36 @@ class Component(ComponentBase):
         manifest `incremental` flag. The fetch window is independent — config-driven (see resources).
         """
         return effective_incremental(resource, self._config.incremental, self._config.primary_key)
+
+    def _load_sticky_columns(self, resource: ResourceDef) -> list[str]:
+        """Every column emitted for this resource on prior incremental runs, persisted in state.json.
+
+        Incremental load appends to the existing table and Storage rejects a load whose column set is
+        NARROWER than that table's. The API exposes no fixed schema (columns are data-derived), so a
+        run whose data omits an optional field would shrink the set and fail the upsert. We remember
+        the columns and re-emit their union, so the schema only ever grows (absent columns write
+        empty). This state is per-row and unrelated to the fetch window (which stays config-driven).
+        """
+        bucket = (self.get_state_file() or {}).get(self._STATE_COLUMNS_KEY)
+        cols = bucket.get(resource.name) if isinstance(bucket, dict) else None
+        return [str(c) for c in cols] if isinstance(cols, list) else []
+
+    def _extend_sticky_columns(self, resource: ResourceDef, seen_columns: list[str]) -> list[str]:
+        """Union this run's columns with the persisted set, persist the grown set, and return it.
+
+        Single state read + write (other state keys preserved). See _load_sticky_columns for why.
+        """
+        state = self.get_state_file() or {}
+        bucket = state.get(self._STATE_COLUMNS_KEY)
+        if not isinstance(bucket, dict):
+            bucket = {}
+        prior = bucket.get(resource.name)
+        prior_cols = [str(c) for c in prior] if isinstance(prior, list) else []
+        columns = sorted(set(seen_columns) | set(prior_cols))
+        bucket[resource.name] = columns
+        state[self._STATE_COLUMNS_KEY] = bucket
+        self.write_state_file(state)
+        return columns
 
     def _compute_window(self, resource: ResourceDef) -> tuple[str | None, str | None]:
         """Return (since_iso, until_iso) — the fetch window, driven purely by Start/End Date config.
@@ -291,8 +324,16 @@ class Component(ComponentBase):
 
             # Phase 2: sorted columns → deterministic manifest schema across incremental runs.
             # Effective PK = the user-supplied primary_key if set, else the resource registry default.
-            columns = sorted(seen_columns)
             primary_key = effective_primary_key(resource, self._config.primary_key)
+            is_incremental = self._effective_incremental(resource)
+            # Sticky schema on incremental load: union this run's columns with every column seen
+            # before (state.json) so the set never shrinks below the existing table, then persist the
+            # grown set. Columns absent this run are written empty (restval=''). A full load replaces
+            # the table, so its schema may vary freely and needs no state.
+            if is_incremental:
+                columns = self._extend_sticky_columns(resource, list(seen_columns))
+            else:
+                columns = sorted(seen_columns)
             schema = {
                 col: ColumnDefinition(
                     data_types=BaseType(
@@ -305,9 +346,8 @@ class Component(ComponentBase):
                 )
                 for col in columns
             }
-            # Storage write mode: incremental upsert only with a stable PK; a keyless resource
-            # with no user PK always full-REPLACEs.
-            is_incremental = self._effective_incremental(resource)
+            # Storage write mode: incremental upsert only with a stable PK (computed above); a
+            # keyless resource with no user PK always full-REPLACEs.
             table = self.create_out_table_definition(
                 f"{resource.name}.csv",
                 primary_key=primary_key,
@@ -340,7 +380,13 @@ class Component(ComponentBase):
         that the destination's previous contents were kept.
         """
         primary_key = effective_primary_key(resource, self._config.primary_key)
-        if not primary_key:
+        is_incremental = self._effective_incremental(resource)
+        # On incremental load, re-emit the full accumulated column set (from state) so a zero-row run
+        # still matches the existing table's schema, with PK columns as the anchor. A keyless full
+        # load has no schema to emit, so keep the destination's previous contents.
+        sticky = self._load_sticky_columns(resource) if is_incremental else []
+        header_cols = sorted(set(primary_key) | set(sticky))
+        if not header_cols:
             logging.info(
                 "No rows returned for resource '%s' and no primary key to build a header from; "
                 "leaving the output table unwritten (a full load keeps its previous contents).",
@@ -352,27 +398,27 @@ class Component(ComponentBase):
                 data_types=BaseType(
                     dtype=(SupportedDataTypes.TIMESTAMP if col in _TIMESTAMP_FIELDS else SupportedDataTypes.STRING)
                 ),
-                nullable=False,
-                primary_key=True,
+                nullable=col not in primary_key,
+                primary_key=col in primary_key,
             )
-            for col in primary_key
+            for col in header_cols
         }
         table = self.create_out_table_definition(
             f"{resource.name}.csv",
             primary_key=primary_key,
-            incremental=self._effective_incremental(resource),
+            incremental=is_incremental,
             has_header=True,
             schema=schema,
         )
         with open(table.full_path, "w", encoding="utf-8", newline="") as fh:
-            csv.DictWriter(fh, fieldnames=primary_key).writeheader()
+            csv.DictWriter(fh, fieldnames=header_cols).writeheader()
         self.write_manifest(table)
         logging.info(
             "No rows returned for resource '%s'; wrote a header-only table with columns %s.",
             resource.name,
-            ", ".join(primary_key),
+            ", ".join(header_cols),
         )
-        return 0, primary_key
+        return 0, header_cols
 
     @sync_action("testConnection")
     def test_connection(self) -> dict[str, str]:

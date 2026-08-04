@@ -1,3 +1,5 @@
+import logging
+
 import pytest
 import requests_mock
 from keboola.component.exceptions import UserException
@@ -126,6 +128,60 @@ def test_apply_read_page_size_overrides_count():
         assert len(rows) == 10
         assert len(captured) == 1
         assert captured[0]["count"] == 25  # page_size overrode resource.page_count (1000)
+
+
+def test_apply_read_page_size_clamped_to_resource_max_page_size():
+    # punches caps apply_read pages at page_count=25 (WTK-124921) -- a larger count 400s. A page_size
+    # override above that ceiling must be clamped down to the resource max, never forwarded verbatim.
+    res = get_resource("timekeeping_punches")  # PaginationStyle.APPLY_READ, page_count=25
+    captured: list[dict] = []
+    with requests_mock.Mocker() as m:
+        c = _client(m)
+
+        def _capture(request, context):
+            body = request.json()
+            captured.append(body)
+            # Short page (< count) so the loop stops after a single request. punches' envelope
+            # nests records under "data" (records_key="data"), not "records".
+            return {"metadata": {}, "data": [{"id": i} for i in range(20)]}
+
+        m.post(f"{HOST}/api/v1{res.endpoint_path}", json=_capture)
+        rows = list(paginate_multi_read(c, res, {"where": {}}, page_size=50))
+        assert len(rows) == 20
+        assert len(captured) == 1
+        assert captured[0]["count"] == 25  # clamped from the requested 50 down to page_count
+
+
+def test_apply_read_page_size_within_resource_max_is_forwarded_unchanged():
+    # persons has a much higher ceiling (page_count=1000); a page_size below it is used as-is,
+    # confirming the clamp only kicks in when page_size actually exceeds the resource's max.
+    res = get_resource("persons")  # PaginationStyle.APPLY_READ, page_count=1000
+    captured: list[dict] = []
+    with requests_mock.Mocker() as m:
+        c = _client(m)
+
+        def _capture(request, context):
+            body = request.json()
+            captured.append(body)
+            return {"records": [{"personNumber": str(i)} for i in range(10)]}
+
+        m.post(f"{HOST}/api/v1{res.endpoint_path}", json=_capture)
+        rows = list(paginate_multi_read(c, res, {"where": {}}, page_size=50))
+        assert len(rows) == 10
+        assert len(captured) == 1
+        assert captured[0]["count"] == 50  # below the 1000 ceiling -> unchanged
+
+
+def test_apply_read_page_size_clamp_logs_warning(caplog):
+    # Clamping is silent data loss risk otherwise -- a warning must call out the requested vs
+    # effective page size so a misconfigured page_size is visible in the job log.
+    res = get_resource("timekeeping_punches")
+    with requests_mock.Mocker() as m:
+        c = _client(m)
+        m.post(f"{HOST}/api/v1{res.endpoint_path}", json={"metadata": {}, "data": []})
+        with caplog.at_level(logging.WARNING):
+            list(paginate_multi_read(c, res, {"where": {}}, page_size=50))
+    assert any("page_size" in r.getMessage() and "clamping" in r.getMessage() for r in caplog.records)
 
 
 def test_apply_read_max_pages_caps_loop():

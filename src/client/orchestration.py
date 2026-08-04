@@ -104,7 +104,19 @@ def _paginate_apply_read(
     Sampling knobs (both default None → prod unaffected): `page_size` overrides the per-page `count`
     (else resource.page_count); `max_pages` caps how many pages the loop fetches.
     """
-    count = page_size if page_size else (resource.page_count or 100)
+    # page_count is the resource's API-safe max page size (e.g. punches caps at 25 per WTK-124921).
+    # `page_size` (an advanced raw-JSON knob) may only shrink the page below that ceiling — a larger
+    # value would 400 — so clamp it rather than forward it blindly.
+    default = resource.page_count or 100
+    count = min(page_size, default) if page_size else default
+    if page_size and page_size > default:
+        logging.warning(
+            "page_size %s exceeds the max page size %s for resource '%s'; clamping to %s.",
+            page_size,
+            default,
+            resource.name,
+            default,
+        )
     page_limit = min(max_pages, _APPLY_READ_MAX_PAGES) if max_pages else _APPLY_READ_MAX_PAGES
     for index in range(page_limit):
         page_body = {**body, "index": index, "count": count}
