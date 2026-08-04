@@ -22,11 +22,11 @@ Authentication & provisioning
 
 - **Grant:** OAuth 2.0 `password` (resource-owner). Auth is always as a user, so a dedicated
   **service account** is required. No `client_credentials`.
-- **Host:** the tenant vanity URL (e.g. `https://acme.prd.mykronos.com`) is a configuration
+- **Host:** the tenant vanity URL (e.g. `https://mycompany.prd.mykronos.com`) is a configuration
   field, never composed. Data calls hit `https://<HOST>/api/v1/...`; auth hits
   `https://<HOST>/api/authentication/access_token`.
 - **Credentials:** `host` + four secrets (`#client_id`, `#client_secret`, `#username`,
-  `#password`). `client_id`/`client_secret` are minted by UKG at tenant provisioning; a tenant
+  `#password`). `client_id`/`client_secret` are issued by UKG when the tenant is set up; a tenant
   Developer Admin must create the service account. The legacy `appkey` is not used.
 - **Tokens:** access token lifetime is unpublished, so the client refreshes proactively from
   `expires_in` minus a safety margin, using `grant_type=refresh_token` when available.
@@ -88,8 +88,9 @@ Incremental & windowing
   populated after the first run, and requires the component's `forwardToken` flag); you can also
   **type the column names directly** when the picker cannot resolve them — before the first run, on a
   dev branch, or with a custom output bucket.
-- A **symbolic period** replaces the date window entirely — when set, Start Date / End Date are
-  ignored, so configure one or the other, not both. It is a dropdown backed by the
+- The **Date Selection** field chooses between an explicit **Date range** (Start / End Date) and a
+  **Symbolic period** — a rolling UKG range (e.g. Current Pay Period) that replaces the date window.
+  The picker shows only the fields for the selected mode. Symbolic Period is a dropdown backed by the
   `list_symbolic_periods` sync action; you pick a period by name and the stored value is its numeric
   id (WFM rejects a name). Not supported for scheduling resources, which need an explicit window.
 - The **Hyperfind Query** field is a dropdown backed by the `list_hyperfinds` sync action, which
