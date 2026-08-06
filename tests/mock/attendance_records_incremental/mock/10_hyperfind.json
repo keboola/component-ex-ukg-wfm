@@ -1,0 +1,5 @@
+{
+  "url": "https://acme.prd.mykronos.com/api/v1/commons/hyperfind/execute",
+  "method": "POST",
+  "json": {"count": 2, "result": {"refs": [{"id": 1}, {"id": 2}], "basePersons": []}}
+}

@@ -1,0 +1,15 @@
+{
+  "action": "run",
+  "parameters": {
+    "host": "https://acme.prd.mykronos.com",
+    "client_id": "DUMMY_CLIENT_ID",
+    "#client_secret": "DUMMY_CLIENT_SECRET",
+    "username": "DUMMY_USER",
+    "#password": "DUMMY_PASSWORD",
+    "resource": "persons",
+    "hyperfind_ref": "253",
+    "load_type": "full_load",
+    "page_size": 25,
+    "max_pages": 2
+  }
+}

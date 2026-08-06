@@ -19,6 +19,12 @@ tests/mock/*/source/data/out/
 tests/mock/*/source/data/in/*
 !tests/mock/*/source/data/in/state.json
 
+# VCR functional recordings: committed cassettes/expected/config are SANITIZED
+# (host rewritten, PII redacted) and manually reviewed. Never commit runtime scratch or secrets.
+tests/functional/*/source/data/config.secrets.json
+tests/functional/*/source/data/out/
+tests/functional/*/source/data/in/
+
 # build lifecycle tracker (local only, never commit)
 docs/superpowers/*-lifecycle.md
 .claude/loop.md

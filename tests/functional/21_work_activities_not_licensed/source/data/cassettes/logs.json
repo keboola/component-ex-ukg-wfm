@@ -1,0 +1,18 @@
+{
+  "exit_code": 1,
+  "stderr": "UKG WFM API error on /api/v1/work/employee_activities/multi_read: HTTP 403 Forbidden\n",
+  "logs": [
+    {
+      "level": "INFO",
+      "logger": "root",
+      "message": "Obtained UKG WFM OAuth token (expires in 1799s).",
+      "timestamp": "2026-07-23T17:18:54.000Z"
+    },
+    {
+      "level": "ERROR",
+      "logger": "root",
+      "message": "UKG WFM API error on /api/v1/work/employee_activities/multi_read: HTTP 403 Forbidden",
+      "timestamp": "2026-07-23T17:18:54.000Z"
+    }
+  ]
+}

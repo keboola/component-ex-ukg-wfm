@@ -1,0 +1,18 @@
+{
+  "exit_code": null,
+  "stderr": "",
+  "logs": [
+    {
+      "level": "INFO",
+      "logger": "root",
+      "message": "Obtained UKG WFM OAuth token (expires in 1799s).",
+      "timestamp": "2026-07-23T17:18:54.000Z"
+    },
+    {
+      "level": "INFO",
+      "logger": "root",
+      "message": "Extracted resource 'hyperfind_queries': 25 rows, 8 columns.",
+      "timestamp": "2026-07-23T17:18:54.000Z"
+    }
+  ]
+}

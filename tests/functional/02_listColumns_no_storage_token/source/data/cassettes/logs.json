@@ -1,0 +1,5 @@
+{
+  "exit_code": 1,
+  "stderr": "Storage token is not available. Enable token forwarding for this component so the column picker can read the output table.",
+  "logs": []
+}

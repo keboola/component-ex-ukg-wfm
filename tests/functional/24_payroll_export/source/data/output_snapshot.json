@@ -1,0 +1,21 @@
+{
+  "files": {},
+  "hash_algorithm": "sha256",
+  "tables": {
+    "payroll_export.csv": {
+      "columns": [
+        "f0_"
+      ],
+      "hash": "sha256:6b0afa1e5e735a1caf22771f29d4551549bf312616b23d28a617c2934f59d827",
+      "row_count": 2,
+      "size_bytes": 8
+    },
+    "payroll_export.csv.manifest": {
+      "columns": null,
+      "hash": "sha256:c2669c7911763310e89d7323109b9c936675c83b88c727c95b0aa2741747f909",
+      "row_count": null,
+      "size_bytes": 301
+    }
+  },
+  "version": "1.0"
+}

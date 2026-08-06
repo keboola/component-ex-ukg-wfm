@@ -1,0 +1,3 @@
+accrualSummaryData,employeeId_id,employeeId_name,employeeId_qualifier
+"[{""accrualCode"": ""Vacation"", ""startingBalanceForPeriod"": 40.0, ""dailySummaries"": [{""balanceDate"": ""2026-07-01"", ""currentBalance"": 40.0}]}]",1,Employee One,10001
+"[{""accrualCode"": ""Sick"", ""startingBalanceForPeriod"": 16.0, ""dailySummaries"": [{""balanceDate"": ""2026-07-01"", ""currentBalance"": 16.0}]}]",2,Employee Two,10002

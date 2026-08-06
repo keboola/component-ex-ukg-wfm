@@ -1,0 +1,3 @@
+fullName,name,nodeId,orgNodeTypeRef_id,orgNodeTypeRef_qualifier,orgPath,persistentId
+/Acme Retail,Acme Retail,101,1,Company,/Acme Retail,acme-root
+/Acme Retail/Downtown Store,Downtown Store,102,2,Location,/Acme Retail/Downtown Store,store-dt

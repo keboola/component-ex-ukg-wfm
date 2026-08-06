@@ -1,0 +1,5 @@
+{
+  "url": "https://acme.prd.mykronos.com/api/v1/commons/hyperfind",
+  "method": "GET",
+  "json": {"hyperfindQueries": []}
+}

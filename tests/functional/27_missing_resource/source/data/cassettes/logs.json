@@ -1,0 +1,12 @@
+{
+  "exit_code": 1,
+  "stderr": "'resource' is required. Configure a resource row.\n",
+  "logs": [
+    {
+      "level": "ERROR",
+      "logger": "root",
+      "message": "'resource' is required. Configure a resource row.",
+      "timestamp": "2026-07-23T17:18:54.000Z"
+    }
+  ]
+}

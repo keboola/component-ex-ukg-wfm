@@ -1,0 +1,8 @@
+{
+  "url": "https://acme.prd.mykronos.com/api/v1/work/activity_shifts/net_changes/multi_read",
+  "method": "POST",
+  "json": {"records": [
+    {"id": 1, "activityName": "Clock In", "changeType": "ADD"},
+    {"id": 2, "activityName": "Break", "changeType": "UPDATE"}
+  ]}
+}

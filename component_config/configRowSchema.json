@@ -1,1 +1,347 @@
-{}
+{
+  "type": "object",
+  "title": "Resource Configuration",
+  "required": ["resource", "load_type"],
+  "properties": {
+    "resource": {
+      "type": "string",
+      "title": "Resource",
+      "description": "UKG Pro WFM resource to extract (one resource per configuration row).",
+      "enum": [
+        "accruals_balances",
+        "accruals_summaries",
+        "accruals_transactions",
+        "attendance_events",
+        "attendance_records",
+        "attestations",
+        "business_structure",
+        "forecasting",
+        "hyperfind_queries",
+        "leave_cases",
+        "leave_edits",
+        "payroll_export",
+        "persons",
+        "scheduling_open_shifts",
+        "scheduling_schedules",
+        "scheduling_shifts",
+        "scheduling_swaps",
+        "timekeeping_punches",
+        "timekeeping_timecard_metrics",
+        "timekeeping_timecards",
+        "work_activities",
+        "work_activity_net_changes",
+        "work_activity_shifts"
+      ],
+      "options": {
+        "enum_titles": [
+          "Accruals — Balances",
+          "Accruals — Summaries",
+          "Accruals — Transactions",
+          "Attendance — Events",
+          "Attendance — Records",
+          "Attestations",
+          "Business Structure",
+          "Forecasting (labor/volume)",
+          "Hyperfind Queries",
+          "Leave — Cases",
+          "Leave — Edits",
+          "Payroll Export (async)",
+          "People / Persons",
+          "Scheduling — Open Shifts",
+          "Scheduling — Schedules",
+          "Scheduling — Shifts",
+          "Scheduling — Swaps",
+          "Timekeeping — Punches",
+          "Timekeeping — Timecard Metrics",
+          "Timekeeping — Timecards",
+          "Work / Activities",
+          "Work / Activities — Net Changes (delta)",
+          "Work / Activities — Shifts"
+        ]
+      },
+      "propertyOrder": 10
+    },
+    "window_type": {
+      "type": "string",
+      "title": "Date Selection",
+      "description": "Choose the fetch window by explicit dates or by a rolling symbolic period",
+      "enum": ["date_window", "symbolic_period"],
+      "default": "date_window",
+      "options": {
+        "enum_titles": ["Date range (Start / End)", "Symbolic period"],
+        "tooltip": "Date range: set an explicit Start Date / End Date window. Symbolic period: use a UKG rolling period (e.g. Current Pay Period) that resolves the range for you. Symbolic periods are not supported for scheduling resources — use a date range there."
+      },
+      "propertyOrder": 20
+    },
+    "load_type": {
+      "type": "string",
+      "title": "Load Type",
+      "description": "How rows are written to the table: full load replaces it each run; incremental load upserts by primary key",
+      "options": {
+        "enum_titles": ["Full Load", "Incremental Load"],
+        "tooltip": "This controls the Storage write mode only, not how much data is fetched — the fetch window is set by Start/End Date. Incremental load upserts by the Primary Key; a resource with no primary key always runs as a full replace."
+      },
+      "enum": ["full_load", "incremental_load"],
+      "default": "incremental_load",
+      "propertyOrder": 75
+    },
+    "since": {
+      "type": "string",
+      "title": "Start Date",
+      "description": "Lower bound of the fetch window",
+      "options": {
+        "tooltip": "ISO 8601 (e.g. `2026-01-01T00:00:00+00:00`) or a relative phrase (e.g. `30 days ago`, `yesterday`). Applied on every run as the lower bound of the fetch window — Load Type only changes how rows are written to Storage, not which data is fetched.",
+        "dependencies": {
+          "window_type": "date_window"
+        }
+      },
+      "propertyOrder": 30
+    },
+    "until": {
+      "type": "string",
+      "title": "End Date",
+      "description": "Upper bound of the fetch window",
+      "options": {
+        "tooltip": "Optional. ISO 8601 (e.g. `2026-02-01T00:00:00+00:00`) or a relative phrase (e.g. `yesterday`, `now`). Leave empty to fetch up to the current run time; set it to bound a backfill to a fixed window.",
+        "dependencies": {
+          "window_type": "date_window"
+        }
+      },
+      "propertyOrder": 40
+    },
+    "payroll_query": {
+      "type": "string",
+      "format": "textarea",
+      "title": "Payroll Export Query",
+      "description": "Tenant-defined payroll export query",
+      "propertyOrder": 45,
+      "options": {
+        "tooltip": "The SQL-like query UKG WFM runs for the async payroll export (POST /commons/payroll/export/async). It is tenant-specific — use the export query your WFM tenant defines. Required for the Payroll Export resource.",
+        "dependencies": {
+          "resource": "payroll_export"
+        }
+      }
+    },
+    "hyperfind_ref": {
+      "type": "string",
+      "title": "Hyperfind Query",
+      "format": "select",
+      "enum": [],
+      "description": "Employee set this resource is pulled for",
+      "options": {
+        "async": {
+          "label": "Load Hyperfinds",
+          "action": "list_hyperfinds",
+          "autoload": true,
+          "cache": true
+        },
+        "tooltip": "The Hyperfind query that resolves which employees this resource extracts. Click Load Hyperfinds and pick from the tenant's saved queries (public, personal, and system). Leave unset to fall back to 'All Home', which large tenants reject above their size threshold — pick a narrower query instead.",
+        "dependencies": {
+          "resource": [
+            "timekeeping_punches",
+            "timekeeping_timecards",
+            "timekeeping_timecard_metrics",
+            "scheduling_schedules",
+            "scheduling_shifts",
+            "scheduling_open_shifts",
+            "scheduling_swaps",
+            "accruals_balances",
+            "accruals_transactions",
+            "accruals_summaries",
+            "leave_cases",
+            "leave_edits",
+            "attendance_records",
+            "attendance_events",
+            "attestations",
+            "work_activities",
+            "work_activity_shifts",
+            "work_activity_net_changes"
+          ]
+        }
+      },
+      "propertyOrder": 50
+    },
+    "hyperfind_threshold": {
+      "type": "integer",
+      "title": "Hyperfind Threshold",
+      "description": "Maximum number of employees the Hyperfind Query above may resolve before the request is rejected.",
+      "minimum": 1,
+      "options": {
+        "tooltip": "UKG rejects a Hyperfind that resolves more employees than this cap with error WCO-112003. UKG's per-request default is low, so a broad Hyperfind ('All Home'/'All People') fails unless it is raised. If left empty, the component applies 50000 — raise it only if your tenant roster is larger, or lower it to cap the roster deliberately.",
+        "dependencies": {
+          "resource": [
+            "timekeeping_punches",
+            "timekeeping_timecards",
+            "timekeeping_timecard_metrics",
+            "scheduling_schedules",
+            "scheduling_shifts",
+            "scheduling_open_shifts",
+            "scheduling_swaps",
+            "accruals_balances",
+            "accruals_transactions",
+            "accruals_summaries",
+            "leave_cases",
+            "leave_edits",
+            "attendance_records",
+            "attendance_events",
+            "attestations",
+            "work_activities",
+            "work_activity_shifts",
+            "work_activity_net_changes"
+          ]
+        }
+      },
+      "propertyOrder": 55
+    },
+    "metric_groups": {
+      "type": "array",
+      "title": "Timecard Metric Groups",
+      "description": "Optional list of metric groups (select tokens) to pull for Timekeeping — Timecard Metrics; each maps to one response section. Leave empty to return ALL sections (larger payload).",
+      "format": "select",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "FTPTDATA_ALL",
+          "FTPTDATA",
+          "AVERAGING",
+          "SCHEDULED_TOTALS",
+          "CONTRACT_TOTALS",
+          "PROJECTED_TOTALS",
+          "PROJECTED_TOTALS_ONLY_CORRECTIONS",
+          "PROJECTED_TOTALS_EXCLUDE_CORRECTIONS",
+          "ACTUAL_TOTALS",
+          "ACTUAL_TOTALS_ONLY_CORRECTIONS",
+          "ACTUAL_TOTALS_EXCLUDE_CORRECTIONS",
+          "EXCEPTION_TOTAL",
+          "EXCEPTION_TOTAL_UNREVIEWED",
+          "EXCEPTION_TOTAL_EMPLOYEE_JUSTIFIED",
+          "EXCEPTION_TOTAL_MANAGER_JUSTIFIED",
+          "EXCEPTION_TOTAL_AUTO_RESOLVED",
+          "SHIFT_ACTUAL_TOTAL_SUMMARY",
+          "SHIFT_SCHEDULED_TOTAL_SUMMARY",
+          "SHIFT_CONTRACT_TOTAL_SUMMARY",
+          "SHIFT_PROJECTED_TOTAL_SUMMARY",
+          "DAILY_ACTUAL_TOTAL_SUMMARY",
+          "DAILY_SCHEDULED_TOTAL_SUMMARY",
+          "DAILY_CONTRACT_TOTAL_SUMMARY",
+          "DAILY_PROJECTED_TOTAL_SUMMARY",
+          "ACCRUAL_SUMMARY",
+          "ACCRUAL_TRANSACTIONS",
+          "ABSENCE_EXCEPTION",
+          "ISR_DAILY",
+          "ISR_SUMMARY"
+        ],
+        "options": {
+          "enum_titles": [
+            "Full/part-time data — all weeks",
+            "Full/part-time data — worked weeks",
+            "Averaging totals",
+            "Scheduled totals",
+            "Contract totals",
+            "Projected totals (incl. corrections)",
+            "Projected totals — corrections only",
+            "Projected totals — exclude corrections",
+            "Actual totals",
+            "Actual totals — corrections only",
+            "Actual totals — exclude corrections",
+            "Exception count — total",
+            "Exception count — unreviewed",
+            "Exception count — employee-justified",
+            "Exception count — manager-justified",
+            "Exception count — auto-resolved",
+            "Shift summary — actual",
+            "Shift summary — scheduled",
+            "Shift summary — contract",
+            "Shift summary — projected",
+            "Daily summary — actual",
+            "Daily summary — scheduled",
+            "Daily summary — contract",
+            "Daily summary — projected",
+            "Accrual summary",
+            "Accrual transactions",
+            "Absence exceptions",
+            "Include summary report — daily",
+            "Include summary report — summary"
+          ]
+        }
+      },
+      "options": {
+        "tooltip": "Pick one or more metric groups; each maps to one response section. UKG recommends selecting the groups you need (up to 10) rather than leaving it empty, which returns every section.",
+        "dependencies": {
+          "resource": ["timekeeping_timecard_metrics"]
+        }
+      },
+      "propertyOrder": 61
+    },
+    "symbolic_period": {
+      "type": "string",
+      "title": "Symbolic Period",
+      "format": "select",
+      "enum": [],
+      "description": "Rolling period window (e.g. Current Pay Period) used instead of an explicit start/end date window",
+      "options": {
+        "async": {
+          "label": "Load Symbolic Periods",
+          "action": "list_symbolic_periods",
+          "autoload": true,
+          "cache": true
+        },
+        "tooltip": "The UKG-named rolling period range (e.g. `Current Pay Period`, `Previous Pay Period`, `Yesterday`, `Today`). Click Load Symbolic Periods and pick from the tenant's periods; the value stored is the numeric id — WFM rejects a period name, only the id works. Not supported for scheduling resources (they require a Date range). See the UKG Pro WFM API reference: https://developer.ukg.com/wfm/reference",
+        "dependencies": {
+          "window_type": "symbolic_period"
+        }
+      },
+      "propertyOrder": 42
+    },
+    "primary_key": {
+      "type": "array",
+      "title": "Primary Key",
+      "description": "Column(s) that identify a row for upsert. The API returns no field list, so columns are read from Storage after the first run — run once then Re-load, or type them.",
+      "format": "select",
+      "uniqueItems": true,
+      "items": {
+        "enum": [],
+        "type": "string"
+      },
+      "options": {
+        "async": {
+          "label": "Re-load Columns from Storage",
+          "action": "list_columns"
+        },
+        "creatable": true,
+        "dependencies": {
+          "load_type": "incremental_load"
+        },
+        "tooltip": "On incremental load the component upserts on these columns. The WFM API doesn't expose a field list, so the picker reads columns from this resource's output table in Storage — which exists only after the first run. Run once, then click Re-load Columns from Storage; or type the column name(s) directly (before the first run, on a dev branch, or with a custom output bucket). Supplying a key also enables upsert for a resource with no registry default. Empty = the resource's registry default."
+      },
+      "propertyOrder": 80
+    },
+    "max_wait_seconds": {
+      "type": "integer",
+      "title": "Payroll Max Wait (seconds)",
+      "description": "Maximum time to poll a Payroll async export before failing (avoids hanging).",
+      "minimum": 1,
+      "options": {
+        "tooltip": "If left empty, the component waits up to 1800 seconds (30 minutes) before failing the poll.",
+        "dependencies": {
+          "resource": "payroll_export"
+        }
+      },
+      "propertyOrder": 90
+    },
+    "poll_interval_seconds": {
+      "type": "integer",
+      "title": "Payroll Poll Interval (seconds)",
+      "description": "Seconds between Payroll async export status polls.",
+      "minimum": 1,
+      "options": {
+        "tooltip": "If left empty, the component polls every 15 seconds.",
+        "dependencies": {
+          "resource": "payroll_export"
+        }
+      },
+      "propertyOrder": 100
+    }
+  }
+}

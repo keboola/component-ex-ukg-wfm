@@ -1,0 +1,8 @@
+{
+  "url": "https://acme.prd.mykronos.com/api/v1/work/activity_shifts/multi_read",
+  "method": "POST",
+  "json": {"records": [
+    {"id": 10, "shiftName": "Morning", "employeeId": 1},
+    {"id": 20, "shiftName": "Evening", "employeeId": 2}
+  ]}
+}

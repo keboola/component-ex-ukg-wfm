@@ -1,0 +1,13 @@
+{
+  "parameters": {
+    "host": "https://acme.prd.mykronos.com",
+    "client_id": "cid",
+    "#client_secret": "csec",
+    "username": "svc_user",
+    "#password": "pw",
+    "resource": "attendance_records",
+    "load_type": "incremental_load",
+    "since": "30 days ago",
+    "hyperfind_ref": "AllHome"
+  }
+}

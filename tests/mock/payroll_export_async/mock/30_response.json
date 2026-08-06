@@ -1,0 +1,8 @@
+{
+  "url": "https://acme.prd.mykronos.com/api/v1/commons/payroll/export/async/EK1/response",
+  "method": "GET",
+  "headers": {
+    "Content-Type": "text/csv"
+  },
+  "text": "id,gross\n1,100\n2,200\n"
+}

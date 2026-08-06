@@ -1,0 +1,3 @@
+accrualTransactions,employeeId_id,employeeId_name,employeeId_qualifier
+"[{""accrualTransId"": 111, ""accrualCode"": ""Vacation"", ""type"": ""GRANT"", ""hoursAmount"": 8.0, ""effectiveDate"": ""2026-07-01""}]",1,Employee One,10001
+"[{""accrualTransId"": 222, ""accrualCode"": ""Sick"", ""type"": ""TAKEN"", ""hoursAmount"": -4.0, ""effectiveDate"": ""2026-07-02""}]",2,Employee Two,10002

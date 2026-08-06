@@ -1,0 +1,19 @@
+{
+  "url": "https://acme.prd.mykronos.com/api/v1/commons/persons/apply_read",
+  "method": "POST",
+  "json": {
+    "totalElements": 2,
+    "records": [
+      {
+        "personNumber": "1001",
+        "firstName": "Ada",
+        "lastName": "Lovelace"
+      },
+      {
+        "personNumber": "1002",
+        "firstName": "Alan",
+        "lastName": "Turing"
+      }
+    ]
+  }
+}

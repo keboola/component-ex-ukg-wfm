@@ -1,0 +1,18 @@
+{
+  "url": "https://acme.prd.mykronos.com/api/v1/attendance/actions/multi_read",
+  "method": "POST",
+  "json": {
+    "records": [
+      {
+        "id": 1,
+        "eventType": "Absence",
+        "occurrenceDate": "2026-06-20"
+      },
+      {
+        "id": 2,
+        "eventType": "Tardy",
+        "occurrenceDate": "2026-06-21"
+      }
+    ]
+  }
+}

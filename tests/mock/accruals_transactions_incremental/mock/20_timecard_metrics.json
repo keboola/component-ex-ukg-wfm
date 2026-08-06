@@ -1,0 +1,20 @@
+{
+  "url": "https://acme.prd.mykronos.com/api/v1/timekeeping/timecard_metrics/multi_read",
+  "method": "POST",
+  "json": [
+    {
+      "employeeId": {"id": 1, "qualifier": "10001", "name": "Employee One"},
+      "accrualTransactions": [
+        {"accrualTransId": 111, "accrualCode": "Vacation", "type": "GRANT",
+         "hoursAmount": 8.0, "effectiveDate": "2026-07-01"}
+      ]
+    },
+    {
+      "employeeId": {"id": 2, "qualifier": "10002", "name": "Employee Two"},
+      "accrualTransactions": [
+        {"accrualTransId": 222, "accrualCode": "Sick", "type": "TAKEN",
+         "hoursAmount": -4.0, "effectiveDate": "2026-07-02"}
+      ]
+    }
+  ]
+}
