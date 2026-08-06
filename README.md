@@ -22,9 +22,10 @@ Authentication & provisioning
 - **Host:** the tenant vanity URL (e.g. `https://mycompany.prd.mykronos.com`) is a configuration
   field, never composed. Data calls hit `https://<HOST>/api/v1/...`; auth hits
   `https://<HOST>/api/authentication/access_token`.
-- **Credentials:** `host` + four secrets (`#client_id`, `#client_secret`, `#username`,
-  `#password`). `client_id`/`client_secret` are issued by UKG when the tenant is set up; a tenant
-  Developer Admin must create the service account. The legacy `appkey` is not used.
+- **Credentials:** `host`, the OAuth `client_id` and service-account `username` (plain
+  identifiers), and two encrypted secrets (`#client_secret`, `#password`). `client_id`/`client_secret`
+  are issued by UKG when the tenant is set up; a tenant Developer Admin must create the service
+  account. The legacy `appkey` is not used.
 - **Tokens:** access token lifetime is unpublished, so the client refreshes proactively from
   `expires_in` minus a safety margin, using `grant_type=refresh_token` when available.
 - **No public sandbox:** there is no self-service WFM sandbox, so credentials come from a

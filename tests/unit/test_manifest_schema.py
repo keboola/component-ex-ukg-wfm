@@ -16,9 +16,9 @@ from component import Component
 
 _PARAMS = {
     "host": "https://acme.prd.mykronos.com",
-    "#client_id": "cid",
+    "client_id": "cid",
     "#client_secret": "csecret",
-    "#username": "user",
+    "username": "user",
     "#password": "pass",
     "resource": "persons",
     "load_type": "full_load",

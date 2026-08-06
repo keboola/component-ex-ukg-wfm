@@ -15,9 +15,12 @@ class Configuration(BaseModel):
 
     # --- root (global auth) ---
     host: str
-    client_id: str = Field(alias="#client_id")
+    # client_id and the service-account username are non-secret identifiers — plain (visible) config
+    # fields, no `#` prefix. Only client_secret and password stay encrypted; neither pair authenticates
+    # without the other.
+    client_id: str
     client_secret: str = Field(alias="#client_secret")
-    username: str = Field(alias="#username")
+    username: str
     password: str = Field(alias="#password")
 
     # --- row (per resource) ---

@@ -11,9 +11,9 @@
   },
   "parameters": {
     "host": "https://mycompany.prd.mykronos.com",
-    "#client_id": "your-client-id",
+    "client_id": "your-client-id",
     "#client_secret": "your-client-secret",
-    "#username": "your-service-account",
+    "username": "your-service-account",
     "#password": "your-service-account-password",
     "resource": "timekeeping_punches",
     "load_type": "incremental_load",

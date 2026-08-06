@@ -7,9 +7,9 @@ from configuration import Configuration, LoadType
 def _root():
     return {
         "host": "https://acme.prd.mykronos.com",
-        "#client_id": "c",
+        "client_id": "c",
         "#client_secret": "s",
-        "#username": "u",
+        "username": "u",
         "#password": "p",
     }
 

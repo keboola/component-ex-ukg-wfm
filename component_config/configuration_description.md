@@ -3,9 +3,9 @@
 | Field | Secret | Description |
 |---|---|---|
 | `host` | no | Your UKG tenant sign-in URL, host only, e.g. `https://mycompany.prd.mykronos.com`. |
-| `#client_id` | yes | OAuth client id issued by UKG when your tenant is set up. |
+| `client_id` | no | OAuth client id issued by UKG when your tenant is set up. |
 | `#client_secret` | yes | OAuth client secret issued by UKG when your tenant is set up. |
-| `#username` | yes | Username of the dedicated UKG service account this extractor signs in as. |
+| `username` | no | Username of the dedicated UKG service account this extractor signs in as. |
 | `#password` | yes | Password of that UKG service account. |
 
 Use the **Test Connection** button to verify your credentials.

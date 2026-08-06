@@ -1,7 +1,7 @@
 {
   "type": "object",
   "title": "UKG Pro WFM Extractor Configuration",
-  "required": ["host", "#client_id", "#client_secret", "#username", "#password"],
+  "required": ["host", "client_id", "#client_secret", "username", "#password"],
   "properties": {
     "host": {
       "type": "string",
@@ -15,9 +15,8 @@
       },
       "propertyOrder": 10
     },
-    "#client_id": {
+    "client_id": {
       "type": "string",
-      "format": "password",
       "title": "Client ID",
       "description": "OAuth client id issued by UKG when your tenant is set up.",
       "propertyOrder": 20
@@ -29,9 +28,8 @@
       "description": "OAuth client secret issued by UKG when your tenant is set up.",
       "propertyOrder": 30
     },
-    "#username": {
+    "username": {
       "type": "string",
-      "format": "password",
       "title": "Service Account Username",
       "description": "Username of the dedicated UKG service account this extractor signs in as.",
       "propertyOrder": 40

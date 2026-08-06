@@ -1,9 +1,9 @@
 {
   "parameters": {
     "host": "https://acme.prd.mykronos.com",
-    "#client_id": "cid",
+    "client_id": "cid",
     "#client_secret": "csec",
-    "#username": "svc_user",
+    "username": "svc_user",
     "#password": "pw",
     "resource": "payroll_export",
     "load_type": "incremental_load",
