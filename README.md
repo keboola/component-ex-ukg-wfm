@@ -6,9 +6,6 @@ Reads the full WFM API surface behind an OAuth password-grant service account, d
 data-driven resource registry, a Hyperfind + chunking `multi_read` engine, and an async
 submit/poll/download engine for Payroll.
 
-**Table of Contents:**
-
-[TOC]
 
 Overview
 ========
