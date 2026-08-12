@@ -398,6 +398,7 @@ def iter_records(
     max_pages: int | None = None,
     hyperfind_threshold: int = 50000,
     batch_size: int | None = None,
+    window_days: int | None = None,
 ) -> Iterator[dict[str, Any]]:
     emp_ids: list[int] = []
     if resource.employee_scope == EmployeeScope.HYPERFIND:
@@ -430,8 +431,22 @@ def iter_records(
     if resource.incremental_style in _WINDOWED_STYLES and since_iso and until_iso:
         start = datetime.fromisoformat(since_iso)
         end = datetime.fromisoformat(until_iso)
-        # Sub-hour granularity for endpoints with a per-call window cap (punches <= 60 min).
-        for w_start, w_end in split_date_windows(start, end, max_minutes=resource.window_max_minutes):
+        # Decide how (and whether) to split the fetch window into sub-windows. Sub-windowing keeps
+        # each response small enough to parse under the memory limit, BUT only per-event resources
+        # can be split by date without changing row semantics:
+        #   - punch-style endpoints MUST split by their per-call minute cap (<= 60 min);
+        #   - window-chunkable per-event resources split by `window_days` (else 365-day pieces);
+        #   - everything else (EMPLOYEE_SET_METRICS rollups, net-change) is read as ONE window —
+        #     splitting a period rollup would emit a partial-period row per sub-window (collapsing
+        #     under the employeeId_id upsert or inflating a full load), so it is never date-split,
+        #     regardless of range length. Memory for those is controlled with `batch_size`.
+        if resource.window_max_minutes > 0:
+            windows = split_date_windows(start, end, max_minutes=resource.window_max_minutes)
+        elif resource.window_chunkable:
+            windows = split_date_windows(start, end, max_days=window_days or 365)
+        else:
+            windows = [(start, end)]
+        for w_start, w_end in windows:
             yield from chunk_and_read(
                 client,
                 resource,

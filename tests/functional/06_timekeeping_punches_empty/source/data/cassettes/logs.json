@@ -11,6 +11,12 @@
     {
       "level": "INFO",
       "logger": "root",
+      "message": "Loading state file..",
+      "timestamp": "2026-07-23T17:18:54.000Z"
+    },
+    {
+      "level": "INFO",
+      "logger": "root",
       "message": "No rows returned for resource 'timekeeping_punches' and no primary key to build a header from; leaving the output table unwritten (a full load keeps its previous contents).",
       "timestamp": "2026-07-23T17:18:54.000Z"
     }

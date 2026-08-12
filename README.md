@@ -65,14 +65,23 @@ Incremental & windowing
 - The **fetch window is driven purely by Start Date / End Date** and is recomputed from the
   configuration on every run — there is no persisted state watermark. **Load Type controls only how
   Storage is written** (full replace vs incremental upsert), never how much data is fetched.
-- **Start Date (`since`)** is the lower bound of the API fetch, applied on every run. Leave it empty
-  for an unbounded lower bound.
+- **Start Date (`since`)** is the lower bound of the API fetch, applied on every run. It is
+  **required** for a date-windowed resource: the WFM read endpoints need a bounded range, so a run
+  with no Start Date (and no Symbolic Period) fails fast with a clear error rather than silently
+  falling back to WFM's default period. Org-snapshot resources (e.g. persons, business structure)
+  have no window and ignore it.
 - **End Date (`until`)** optionally bounds the upper end (empty = the current run time). Because there
-  is no watermark, an absolute End Date simply fetches the same `[since, until]` window each run; an
-  empty window (Start Date not before End Date) is logged as a warning.
-- The window is split into **≤365-day sub-windows** to respect service limits; employee sets are
-  chunked by each resource's per-call batch limit (≤500 for most, 100 for persons, 50 for activity
-  net-changes) and adaptively **halved on HTTP 413**.
+  is no watermark, an absolute End Date simply fetches the same `[since, until]` window each run. An
+  inverted window (Start Date on or after End Date) fails fast with a clear error.
+- The window is split into sub-windows to respect service limits and cap memory — **≤365 days by
+  default**, or **`window_days`** when set (lower it to pull a large range in smaller pieces). Because
+  WFM's `endDate` is inclusive, sub-windows are split so no calendar day is fetched twice.
+  `window_days` applies to **per-event resources only** (schedules, shifts, timecards, leave,
+  attendance, attestations); **rollup resources** (timecard metrics, accruals) return one total per
+  employee and reject it — control their memory with a smaller employee **`batch_size`** instead.
+- Employee sets are chunked by each resource's per-call batch limit (≤500 for most, 100 for
+  timecard-metrics/persons, 50 for activity net-changes), overridable per config with `batch_size`,
+  and adaptively **halved on HTTP 413**.
 - Net-change resources currently run as a date-windowed full **replace** (like other keyless
   resources); true net-change delta is deferred until a resource gains a stable primary key.
 - A run that returns **no rows** writes a header-only table when the resource has a primary key (so a
