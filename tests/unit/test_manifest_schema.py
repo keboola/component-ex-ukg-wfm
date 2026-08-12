@@ -170,6 +170,41 @@ def test_full_load_backfills_sticky_columns_from_state(tmp_path, monkeypatch):
     assert {"actualTotals", "employeeId_id", "employeeId_name", "employeeId_qualifier"} <= set(cols)
 
 
+def test_timecard_metrics_explodes_to_line_items_keyed_on_uniqueid(tmp_path, monkeypatch):
+    """Exploded metrics: one row per line item, keyed on uniqueId (non-nullable PK), applyDate
+    promoted to a column; an employee with an empty section contributes no rows."""
+    params = {
+        **_PARAMS,
+        "resource": "timekeeping_timecard_metrics",
+        "load_type": "incremental_load",
+        "metric_group": "ACTUAL_TOTALS",
+    }
+    component = _build_component(tmp_path, monkeypatch, params)
+    resource = get_resource("timekeeping_timecard_metrics")
+
+    records = iter(
+        [
+            {
+                "employeeId": {"id": 14212},
+                "actualTotals": [
+                    {"uniqueId": "14212:2026-07-27:409", "applyDate": "2026-07-27", "hoursAmount": 8.0},
+                    {"uniqueId": "14212:2026-07-26:801", "applyDate": "2026-07-26", "hoursAmount": 6.0},
+                ],
+            },
+            {"employeeId": {"id": 67127}, "actualTotals": []},  # empty section -> no rows
+        ]
+    )
+    row_count, columns = component._stream_and_write_table(resource, records)
+
+    assert row_count == 2
+    manifest = _manifest(tmp_path / "data", "timekeeping_timecard_metrics")
+    assert manifest["incremental"] is True
+    cols = _schema_by_col(tmp_path / "data", "timekeeping_timecard_metrics")
+    assert cols["uniqueId"]["primary_key"] is True
+    assert cols["uniqueId"].get("nullable", False) is False
+    assert {"uniqueId", "employeeId_id", "applyDate", "hoursAmount"} <= set(cols)
+
+
 def test_composite_pk_all_key_columns_non_nullable(component, tmp_path):
     """Every column in a composite primary key must be non-nullable."""
     resource = ResourceDef(

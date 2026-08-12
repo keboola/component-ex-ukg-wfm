@@ -14,12 +14,11 @@ from client.payroll import run_async_export
 from client.resources import (
     IncrementalStyle,
     ResourceDef,
-    effective_incremental,
-    effective_primary_key,
     get_resource,
+    resolve_primary_key,
 )
 from client.storage import default_output_table_id, get_table_columns
-from client.transform import flatten_record
+from client.transform import explode_record, flatten_record
 from client.wfm_client import WfmClient
 from client.window import resolve_window
 from configuration import Configuration
@@ -206,17 +205,19 @@ class Component(ComponentBase):
                 "Remove Window Chunk Size (days) — for a rollup resource (timecard metrics, accruals) "
                 "use 'batch_size' to control memory instead."
             )
+        # An exploded metrics resource needs exactly one section to explode. An empty selection
+        # makes the API return every section (multiple lists per entry), which cannot be exploded
+        # into one coherent table — fail fast before any request rather than emit a broken shape.
+        if resource.explode and not self._config.effective_select:
+            raise UserException(
+                f"Resource '{resource.name}' requires exactly one metric group. Pick a single "
+                "Timecard Metric Group so its line items can be exploded into rows."
+            )
         since_iso, until_iso = self._compute_window(resource)
         record_iter = self._record_source(resource, since_iso, until_iso)
         row_count, columns = self._stream_and_write_table(resource, record_iter)
         if row_count:
             logging.info("Extracted resource '%s': %s rows, %s columns.", resource.name, row_count, len(columns))
-
-    def _effective_incremental(self, resource: ResourceDef) -> bool:
-        """Predicate governing the Storage write mode (incremental upsert vs full replace) and the
-        manifest `incremental` flag. The fetch window is independent — config-driven (see resources).
-        """
-        return effective_incremental(resource, self._config.incremental, self._config.primary_key)
 
     def _load_sticky_columns(self, resource: ResourceDef) -> list[str]:
         """Every column emitted for this resource on prior runs, persisted in state.json.
@@ -327,36 +328,45 @@ class Component(ComponentBase):
         seen_columns: dict[str, None] = {}  # insertion-order set for dedup; sorted at write time
         row_count = 0
 
+        def _rows(record: dict[str, Any]) -> Iterator[dict[str, Any]]:
+            if resource.explode:
+                for exploded in explode_record(record):
+                    yield flatten_record(exploded)
+            else:
+                yield flatten_record(record)
+
         # Phase 1: stream rows into a disk temp file.
         # extrasaction='ignore' + restval='' handle sparse rows (columns seen only on later rows
         # are back-filled as empty strings when the final writer re-emits with restval='').
         with tempfile.TemporaryFile(mode="w+", encoding="utf-8", newline="", suffix=".csv") as tmp:
             deferred_writer: csv.DictWriter | None = None
             for record in record_iter:
-                row = flatten_record(record)
-                for key in row:
-                    seen_columns[key] = None
-                if deferred_writer is None:
-                    # Create writer on first row; fieldnames extended below as new columns arrive
-                    deferred_writer = csv.DictWriter(
-                        tmp,
-                        fieldnames=list(seen_columns),
-                        extrasaction="ignore",
-                        restval="",
-                    )
-                elif set(row.keys()) - set(deferred_writer.fieldnames):
-                    # New columns encountered — extend fieldnames for subsequent rows
-                    deferred_writer.fieldnames = list(seen_columns)
-                deferred_writer.writerow(row)
-                row_count += 1
+                for row in _rows(record):
+                    for key in row:
+                        seen_columns[key] = None
+                    if deferred_writer is None:
+                        # Create writer on first row; fieldnames extended below as new columns arrive
+                        deferred_writer = csv.DictWriter(
+                            tmp,
+                            fieldnames=list(seen_columns),
+                            extrasaction="ignore",
+                            restval="",
+                        )
+                    elif set(row.keys()) - set(deferred_writer.fieldnames):
+                        # New columns encountered — extend fieldnames for subsequent rows
+                        deferred_writer.fieldnames = list(seen_columns)
+                    deferred_writer.writerow(row)
+                    row_count += 1
 
             if row_count == 0:
                 return self._write_empty_table(resource)
 
             # Phase 2: sorted columns → deterministic manifest schema across incremental runs.
-            # Effective PK = the user-supplied primary_key if set, else the resource registry default.
-            primary_key = effective_primary_key(resource, self._config.primary_key)
-            is_incremental = self._effective_incremental(resource)
+            # PK is resolved from the columns actually produced: an exploded resource keys on
+            # uniqueId when present (resolve_primary_key), else the user/registry key. Incremental
+            # upsert engages only with a non-empty PK.
+            primary_key = resolve_primary_key(resource, list(seen_columns), self._config.primary_key)
+            is_incremental = self._config.incremental and bool(primary_key)
             # Sticky schema: union this run's columns with every column seen before (state.json) so
             # the set never shrinks below the existing table, then persist the grown set. Columns
             # absent this run are written empty (restval=''). This applies to full loads too, not
@@ -412,13 +422,15 @@ class Component(ComponentBase):
         returned nothing) — is there no schema to emit; there we leave the table unwritten and log
         that the destination's previous contents were kept (we cannot create a schema-less table).
         """
-        primary_key = effective_primary_key(resource, self._config.primary_key)
-        is_incremental = self._effective_incremental(resource)
+        # PK resolved against the sticky columns so a prior uniqueId key (from an exploded resource)
+        # is preserved even on a zero-row run.
+        sticky = self._load_sticky_columns(resource)
+        primary_key = resolve_primary_key(resource, sticky, self._config.primary_key)
+        is_incremental = self._config.incremental and bool(primary_key)
         # Re-emit the full accumulated column set (from state) so a zero-row run still matches the
         # existing table's schema, with PK columns as the anchor. Applies to full loads too: a
         # native-typed table rejects a REPLACE with a narrower column set. A keyless resource with no
         # columns ever seen has no schema to emit, so we keep the destination's previous contents.
-        sticky = self._load_sticky_columns(resource)
         header_cols = sorted(set(primary_key) | set(sticky))
         if not header_cols:
             logging.info(

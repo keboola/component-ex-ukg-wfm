@@ -17,7 +17,7 @@
     {
       "level": "INFO",
       "logger": "root",
-      "message": "Extracted resource 'timekeeping_timecard_metrics': 25 rows, 4 columns.",
+      "message": "Extracted resource 'timekeeping_timecard_metrics': 221 rows, 35 columns.",
       "timestamp": "2026-07-27T17:27:35.000Z"
     }
   ]

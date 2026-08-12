@@ -11,6 +11,7 @@ from client.resources import (
     IncrementalStyle,
     PaginationStyle,
     get_resource,
+    resolve_primary_key,
 )
 
 _ROW_SCHEMA = Path(__file__).parents[2] / "component_config" / "configRowSchema.json"
@@ -67,6 +68,38 @@ def test_accruals_share_timecard_metrics_endpoint_via_select():
     assert balances.select == ["ACCRUAL_SUMMARY"]
     assert summaries.select == ["ACCRUAL_SUMMARY"]
     assert transactions.select == ["ACCRUAL_TRANSACTIONS"]
+
+
+def test_timecard_metrics_is_exploded_and_keyless_in_registry():
+    r = get_resource("timekeeping_timecard_metrics")
+    assert r.explode is True
+    assert r.primary_key == []
+
+
+def test_resolve_pk_exploded_prefers_uniqueid():
+    r = get_resource("timekeeping_timecard_metrics")
+    assert resolve_primary_key(r, ["uniqueId", "employeeId_id", "applyDate"]) == ["uniqueId"]
+
+
+def test_resolve_pk_uniqueid_wins_over_config_for_exploded():
+    r = get_resource("timekeeping_timecard_metrics")
+    assert resolve_primary_key(r, ["uniqueId"], config_pk=["employeeId_id"]) == ["uniqueId"]
+
+
+def test_resolve_pk_exploded_without_uniqueid_falls_back_to_config():
+    r = get_resource("timekeeping_timecard_metrics")
+    assert resolve_primary_key(r, ["employeeId_id", "applyDate"], config_pk=["employeeId_id"]) == ["employeeId_id"]
+
+
+def test_resolve_pk_exploded_without_uniqueid_or_config_is_keyless():
+    r = get_resource("timekeeping_timecard_metrics")
+    assert resolve_primary_key(r, ["employeeId_id"]) == []
+
+
+def test_resolve_pk_non_exploded_ignores_uniqueid():
+    r = get_resource("persons")  # not exploded; registry PK ["personNumber"]
+    assert resolve_primary_key(r, ["uniqueId", "personNumber"]) == ["personNumber"]
+    assert resolve_primary_key(r, ["personNumber"], config_pk=["id"]) == ["id"]
 
 
 def test_business_structure_uses_legacy_locations():

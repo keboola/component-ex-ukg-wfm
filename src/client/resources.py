@@ -107,6 +107,11 @@ class ResourceDef(BaseModel):
     # ("records","result","data") fallback). A dict value under the key is wrapped as one row.
     records_key: str | None = None
     primary_key: list[str] = Field(default_factory=list)
+    # When True, each API record is expanded into one row per line item of its single list section
+    # (see transform.explode_record) instead of one row with the list JSON-serialized. Used by
+    # timecard_metrics so the chosen metric section becomes per-line-item rows; the PK is then
+    # resolved dynamically (resolve_primary_key) rather than from a static registry key.
+    explode: bool = False
 
     @property
     def window_chunkable(self) -> bool:
@@ -243,7 +248,10 @@ RESOURCE_REGISTRY: dict[str, ResourceDef] = {
         incremental_style=IncrementalStyle.DATE_WINDOW,
         date_field="start",
         records_key=None,
-        primary_key=["employeeId_id"],
+        explode=True,
+        # Exploded to per-line-item rows; the PK is uniqueId when present (resolve_primary_key), so
+        # the registry key is empty (dynamic). accruals keep employeeId_id — they are not exploded.
+        primary_key=[],
     ),
     # VERIFIED: /scheduling/schedule/multi_read returns a COMPOSITE of entity lists (shifts,
     # scheduleDayList, openShifts, holidays, ...). Three registry resources share this one
@@ -548,6 +556,26 @@ def get_resource(name: str) -> ResourceDef:
 def effective_primary_key(resource: ResourceDef, config_pk: list[str] | None = None) -> list[str]:
     """The primary key for the output table: the user-supplied one wins over the registry default."""
     return config_pk or resource.primary_key
+
+
+# The natural per-line-item key exploded metric rows expose (employeeId:applyDate:payCode).
+_EXPLODE_PK = "uniqueId"
+
+
+def resolve_primary_key(
+    resource: ResourceDef, seen_columns: list[str], config_pk: list[str] | None = None
+) -> list[str]:
+    """The output-table primary key, resolving the dynamic key for exploded resources.
+
+    For an exploded resource the component owns the key: when the exploded rows expose `uniqueId`
+    (the per-line-item natural key) it is the PK — even over a user/registry key — so sections that
+    carry it (Actual/Scheduled/… totals) upsert incrementally with a real applyDate column. A
+    section without `uniqueId`, and every non-exploded resource, falls back to effective_primary_key
+    (user-supplied `primary_key` over the registry default).
+    """
+    if resource.explode and _EXPLODE_PK in seen_columns:
+        return [_EXPLODE_PK]
+    return effective_primary_key(resource, config_pk)
 
 
 def effective_incremental(resource: ResourceDef, incremental_load: bool, config_pk: list[str] | None = None) -> bool:
