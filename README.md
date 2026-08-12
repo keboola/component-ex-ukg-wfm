@@ -54,6 +54,11 @@ Supported resources
 > by the `select` value: `accruals_balances` and `accruals_summaries` use `ACCRUAL_SUMMARY` (which carries
 > balance data), `accruals_transactions` uses `ACCRUAL_TRANSACTIONS`. There is no bulk `/accruals/*` read.
 >
+> **Timekeeping / `timekeeping_timecard_metrics`** requires a single **Timecard Metric Group**;
+> its response section is exploded into one row per line item (columns include `applyDate`, `hoursAmount`,
+> `payCode`, …) with `uniqueId` (`employeeId:applyDate:payCode`) as the primary key. Sections that expose
+> `uniqueId` upsert incrementally; a section without it falls back to full replace unless you set a Primary Key.
+>
 > The **Work / Activities** resources require the Activities Integration API license, which is off on the
 > reference tenant (HTTP 403 `WFA-000030`); their request shapes are verified but a live 200 is gated on
 > licensing. **Forecasting** needs a non-empty tenant-configured `categoryDrivers` set; the reference
