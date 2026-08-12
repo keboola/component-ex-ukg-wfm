@@ -1,6 +1,7 @@
 import csv
 import logging
 import tempfile
+import time
 from collections.abc import Iterator
 from typing import Any
 
@@ -336,9 +337,17 @@ class Component(ComponentBase):
 
         The full dataset is never held in memory. The temp file lives in /tmp (tempfile
         default), never under data/out/tables/.
+
+        record_iter is lazily driven, so fetching (Hyperfind resolve + multi_read API calls)
+        and writing (explode/flatten/CSV write) are interleaved. fetch_s/write_s time the two
+        sides separately by timing each next(record_iter) call on its own, so a slow run can be
+        attributed to the API vs. local processing.
         """
         seen_columns: dict[str, None] = {}  # insertion-order set for dedup; sorted at write time
+        known_fields: set[str] = set()  # mirrors seen_columns' keys for O(1) new-column checks
         row_count = 0
+        fetch_s = 0.0
+        write_s = 0.0
 
         def _rows(record: dict[str, Any]) -> Iterator[dict[str, Any]]:
             if resource.explode:
@@ -350,12 +359,26 @@ class Component(ComponentBase):
         # Phase 1: stream rows into a disk temp file.
         # extrasaction='ignore' + restval='' handle sparse rows (columns seen only on later rows
         # are back-filled as empty strings when the final writer re-emits with restval='').
+        records = iter(record_iter)
         with tempfile.TemporaryFile(mode="w+", encoding="utf-8", newline="", suffix=".csv") as tmp:
             deferred_writer: csv.DictWriter | None = None
-            for record in record_iter:
+            while True:
+                fetch_start = time.monotonic()
+                try:
+                    record = next(records)
+                except StopIteration:
+                    fetch_s += time.monotonic() - fetch_start
+                    break
+                fetch_s += time.monotonic() - fetch_start
+
+                write_start = time.monotonic()
                 for row in _rows(record):
+                    new_columns = False
                     for key in row:
-                        seen_columns[key] = None
+                        if key not in known_fields:
+                            known_fields.add(key)
+                            seen_columns[key] = None
+                            new_columns = True
                     if deferred_writer is None:
                         # Create writer on first row; fieldnames extended below as new columns arrive
                         deferred_writer = csv.DictWriter(
@@ -364,11 +387,12 @@ class Component(ComponentBase):
                             extrasaction="ignore",
                             restval="",
                         )
-                    elif set(row.keys()) - set(deferred_writer.fieldnames):
+                    elif new_columns:
                         # New columns encountered — extend fieldnames for subsequent rows
                         deferred_writer.fieldnames = list(seen_columns)
                     deferred_writer.writerow(row)
                     row_count += 1
+                write_s += time.monotonic() - write_start
 
             if row_count == 0:
                 return self._write_empty_table(resource)
@@ -411,17 +435,41 @@ class Component(ComponentBase):
             )
 
             # Rewind temp file, then stream-copy one row at a time into the final out-table path.
-            # The reader uses insertion-order fieldnames so each dict maps correctly to values;
-            # the writer re-emits with sorted fieldnames (extrasaction='ignore', restval='').
+            # Phase 1 wrote each row with the insertion-order fieldnames list AS OF that row, which
+            # only ever grows by appending — so a row's physical CSV fields are always a stable
+            # PREFIX of the final insertion order. That means a column's index in the final
+            # insertion order also locates it correctly within any shorter, earlier-written row: if
+            # the column existed yet (index < that row's field count) its value sits at that index;
+            # if not (a later-added, trailing column) the row simply has no such field. A
+            # precomputed name->index permutation lets each row be reordered with plain list
+            # indexing (csv.reader/csv.writer) instead of DictReader/DictWriter's per-row dict
+            # construction, while reproducing the exact same restval='' back-fill for both cases.
+            phase2_start = time.monotonic()
+            insertion_order = list(seen_columns)
+            index_by_name = {name: i for i, name in enumerate(insertion_order)}
+            perm = [index_by_name.get(col, -1) for col in columns]
+
             tmp.seek(0)
-            reader = csv.DictReader(tmp, fieldnames=list(seen_columns))
+            reader = csv.reader(tmp)
             with open(table.full_path, "w", encoding="utf-8", newline="") as fh:
-                writer = csv.DictWriter(fh, fieldnames=columns, extrasaction="ignore", restval="")
-                writer.writeheader()
-                for row in reader:
-                    writer.writerow(row)
+                writer = csv.writer(fh)
+                writer.writerow(columns)
+                for values in reader:
+                    if not values:  # blank physical line; DictReader skipped these too
+                        continue
+                    n = len(values)
+                    writer.writerow([values[i] if 0 <= i < n else "" for i in perm])
+            phase2_s = time.monotonic() - phase2_start
 
         self.write_manifest(table)
+        logging.info(
+            "Resource '%s': %s rows (fetch %.1fs, process+write %.1fs, phase2 %.1fs).",
+            resource.name,
+            row_count,
+            fetch_s,
+            write_s,
+            phase2_s,
+        )
         return row_count, columns
 
     def _write_empty_table(self, resource: ResourceDef) -> tuple[int, list[str]]:

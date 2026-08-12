@@ -17,6 +17,12 @@
     {
       "level": "INFO",
       "logger": "root",
+      "message": "Resource 'scheduling_shifts': 9 rows (fetch 0.0s, process+write 0.0s, phase2 0.0s).",
+      "timestamp": "2026-07-23T17:18:54.000Z"
+    },
+    {
+      "level": "INFO",
+      "logger": "root",
       "message": "Extracted resource 'scheduling_shifts': 9 rows, 21 columns.",
       "timestamp": "2026-07-23T17:18:54.000Z"
     }

@@ -54,6 +54,10 @@ def _schema_by_col(data_dir: Path, table: str) -> dict[str, dict]:
     return {col["name"]: col for col in _manifest(data_dir, table)["schema"]}
 
 
+def _csv_rows(data_dir: Path, table: str) -> list[str]:
+    return (data_dir / "out" / "tables" / f"{table}.csv").read_text().splitlines()
+
+
 def test_user_primary_key_drives_manifest_and_incremental_on_keyless_resource(tmp_path, monkeypatch):
     """A user-supplied primary_key sets the manifest PK and enables incremental upsert
     on an otherwise-registry-keyless resource."""
@@ -132,6 +136,37 @@ def test_keyless_resource_all_columns_nullable(component, tmp_path):
     for name in ("a", "b"):
         assert cols[name]["nullable"] is True
         assert cols[name].get("primary_key", False) is False
+
+
+def test_ragged_rows_backfill_later_added_column_as_empty(component, tmp_path):
+    """Locks in the phase-2 reorder in _stream_and_write_table (csv.reader + a precomputed
+    name->index permutation, replacing DictReader/DictWriter) against the ragged-row case: a
+    column that first appears on a LATER row must still read back correctly for every row once
+    columns are re-sorted, with the earlier row's missing value backfilled as an empty string —
+    the same restval='' semantics as before, just computed without per-row dict construction."""
+    resource = ResourceDef(
+        name="ragged_probe",
+        family="people",
+        method="GET",
+        endpoint_path="/probe",
+        primary_key=[],
+    )
+    # Row 1 has no "c" — it is only introduced by row 2, so phase 1 writes row 1 with fewer
+    # physical columns than row 2 (a growing insertion-order fieldnames list).
+    records = iter(
+        [
+            {"a": "1", "b": "2"},
+            {"a": "3", "b": "4", "c": "5"},
+        ]
+    )
+    row_count, columns = component._stream_and_write_table(resource, records)
+    assert row_count == 2
+    assert columns == ["a", "b", "c"]
+
+    rows = _csv_rows(tmp_path / "data", "ragged_probe")
+    assert rows[0] == "a,b,c"
+    assert rows[1] == "1,2,"  # row 1's "c" backfilled empty
+    assert rows[2] == "3,4,5"
 
 
 def test_full_load_backfills_sticky_columns_from_state(tmp_path, monkeypatch):
