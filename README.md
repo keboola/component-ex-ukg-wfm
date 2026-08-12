@@ -58,6 +58,9 @@ Supported resources
 > its response section is exploded into one row per line item (columns include `applyDate`, `hoursAmount`,
 > `payCode`, …) with `uniqueId` (`employeeId:applyDate:payCode`) as the primary key. Sections that expose
 > `uniqueId` upsert incrementally; a section without it falls back to full replace unless you set a Primary Key.
+> Changing the selected Timecard Metric Group on an existing incremental configuration warrants a full
+> load / table reset: sticky columns never shrink (stale empty columns from the previous group linger)
+> and the `uniqueId` upsert only replaces matching keys, so rows from the old group are orphaned.
 >
 > The **Work / Activities** resources require the Activities Integration API license, which is off on the
 > reference tenant (HTTP 403 `WFA-000030`); their request shapes are verified but a live 200 is gated on

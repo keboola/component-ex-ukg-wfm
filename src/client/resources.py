@@ -579,17 +579,19 @@ def resolve_primary_key(
 
 
 def effective_incremental(resource: ResourceDef, incremental_load: bool, config_pk: list[str] | None = None) -> bool:
-    """Single source of truth for whether a run writes to Storage *incrementally*.
+    """Whether a run writes to Storage *incrementally*, given a resource and a static config PK.
 
     A run upserts (append + PK dedup, manifest `incremental=True`) ONLY when the user selected
     incremental_load AND there is a stable primary key to upsert against — either the resource
-    registry default OR a user-supplied `primary_key`.
+    registry default OR a user-supplied `primary_key`. Without any PK, an incremental append would
+    duplicate rows unboundedly, so such a resource must run as a full REPLACE every run regardless
+    of the configured load type.
 
-    Without any PK, an incremental append would duplicate rows unboundedly, so such a resource
-    must run as a full REPLACE every run regardless of the configured load type.
-
-    This governs the Storage write mode and the manifest `incremental` flag only. The fetch window
-    is independent: it is driven purely by the Start/End Date config (see window.resolve_window) and
-    recomputed on every run — there is no state watermark.
+    The component's write path (`component.py`) no longer calls this function directly: it inlines
+    the equivalent `incremental_load and bool(primary_key)` using the *dynamically resolved* PK from
+    `resolve_primary_key` (which accounts for `seen_columns`), so exploded resources whose PK is the
+    runtime-discovered `uniqueId` are handled correctly — something a static `config_pk` alone can't
+    express. This function remains the documented reference for the incremental rule on
+    keyless-vs-keyed resources and is covered by `tests/unit/test_incremental_model.py`.
     """
     return incremental_load and bool(effective_primary_key(resource, config_pk))
