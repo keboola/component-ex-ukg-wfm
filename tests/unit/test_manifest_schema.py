@@ -138,7 +138,12 @@ def test_full_load_backfills_sticky_columns_from_state(tmp_path, monkeypatch):
     """A full_load run whose data omits an optional column must still emit it (unioned from state),
     so a native-typed REPLACE isn't rejected with 'Missing columns'. Regression for the downstream
     schema-mismatch failure the End-Date bug produced (near-empty result dropped 'actualTotals').
-    Sticky columns now apply to full loads, not just incremental."""
+    Sticky columns now apply to full loads, not just incremental.
+
+    timekeeping_timecard_metrics is exploded: a source record with no line-item section (mirroring
+    an employee with nothing to report) now correctly yields ZERO output rows (not a phantom
+    identity row), so this run falls through to the zero-row header-only path. The sticky-column
+    backfill must still apply there, from state, so the destination schema doesn't narrow."""
     params = {**_PARAMS, "resource": "timekeeping_timecard_metrics", "load_type": "full_load"}
     data_dir = _make_datadir(tmp_path, params)
     # A prior good run recorded the full column set (incl. the optional actualTotals) in state.
@@ -160,11 +165,12 @@ def test_full_load_backfills_sticky_columns_from_state(tmp_path, monkeypatch):
     component = Component()
     resource = get_resource("timekeeping_timecard_metrics")
 
-    # This run mirrors the near-empty response: the actualTotals column is absent from the data.
+    # This run mirrors the near-empty response: no record carries a line-item section, so explode
+    # drops every record and the run yields zero data rows.
     records = iter([{"employeeId_id": "E1", "employeeId_name": "x", "employeeId_qualifier": "q"}])
     row_count, columns = component._stream_and_write_table(resource, records)
 
-    assert row_count == 1
+    assert row_count == 0
     assert "actualTotals" in columns  # back-filled from sticky state despite being absent in the data
     cols = _schema_by_col(tmp_path / "data", "timekeeping_timecard_metrics")
     assert {"actualTotals", "employeeId_id", "employeeId_name", "employeeId_qualifier"} <= set(cols)

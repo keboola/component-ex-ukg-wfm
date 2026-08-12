@@ -22,14 +22,14 @@ def explode_record(record: dict[str, Any]) -> Iterator[dict[str, Any]]:
 
     A timecard_metrics entry (single metric select) is {"employeeId": {...}, "<section>": [items]}.
     Yield one dict per item, merged with the entry's non-list fields (employeeId) so every row is
-    self-contained; callers still apply flatten_record. An entry with no list section yields the
-    single entry unchanged (fallback); an empty section yields no rows. Only the FIRST list section
-    is exploded — with a single metric select there is exactly one; any other list stays on the base
-    dict for flatten_record to JSON-serialize.
+    self-contained; callers still apply flatten_record. An entry with no list section (the API omits
+    the key entirely when an employee has no line items) yields NO rows — same as an explicit empty
+    section — so an employee with nothing to report never produces a blank-uniqueId identity row.
+    Only the FIRST list section is exploded — with a single metric select there is exactly one; any
+    other list stays on the base dict for flatten_record to JSON-serialize.
     """
     list_keys = [key for key, value in record.items() if isinstance(value, list)]
     if not list_keys:
-        yield record
         return
     section = list_keys[0]
     base = {key: value for key, value in record.items() if key != section}

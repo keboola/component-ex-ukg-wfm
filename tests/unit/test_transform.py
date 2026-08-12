@@ -20,8 +20,8 @@ def test_explode_empty_section_yields_no_rows():
     assert list(explode_record({"employeeId": {"id": 67127}, "actualTotals": []})) == []
 
 
-def test_explode_no_list_section_yields_single_entry():
-    assert list(explode_record({"employeeId": {"id": 1}})) == [{"employeeId": {"id": 1}}]
+def test_explode_no_list_section_yields_no_rows():
+    assert list(explode_record({"employeeId": {"id": 1}})) == []
 
 
 def test_explode_scalar_list_items_wrap_under_section_key():
