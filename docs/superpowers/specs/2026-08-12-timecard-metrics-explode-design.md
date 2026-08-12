@@ -82,7 +82,7 @@ def explode_record(record: dict) -> Iterator[dict]:
 
     Split the entry into non-list fields (e.g. employeeId) and the one list-valued section.
     Yield {**flatten(non_list_fields), **flatten(item)} per list item. If the entry has no
-    list section, yield the single flattened entry (graceful fallback).
+    list section (empty OR absent), yield nothing — an employee with no line items produces no rows.
     """
 ```
 

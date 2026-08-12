@@ -29,7 +29,7 @@
 
 **Interfaces:**
 - Consumes: nothing (pure function over a dict).
-- Produces: `explode_record(record: dict[str, Any]) -> Iterator[dict[str, Any]]` — yields one dict per line item of the record's single list section, merged with the record's non-list fields; yields the record unchanged when it has no list section; yields nothing when the section list is empty. Callers still apply `flatten_record` to each yielded dict.
+- Produces: `explode_record(record: dict[str, Any]) -> Iterator[dict[str, Any]]` — yields one dict per line item of the record's single list section, merged with the record's non-list fields; yields nothing when the section is empty **or absent** (an employee with no line items produces no rows). Callers still apply `flatten_record` to each yielded dict. (As-built: an earlier draft of this task yielded the record unchanged for the no-list-section case; it was corrected to zero rows during implementation — `src/client/transform.py` is the source of truth.)
 
 - [ ] **Step 1: Write the failing tests**
 
