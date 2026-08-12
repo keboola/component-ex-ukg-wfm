@@ -122,6 +122,16 @@
       },
       "propertyOrder": 41
     },
+    "batch_size": {
+      "type": "integer",
+      "title": "Employee Batch Size",
+      "description": "Employees fetched per API request. Lower it if a run hits the 256 MB memory limit.",
+      "minimum": 1,
+      "options": {
+        "tooltip": "Optional. Number of employees sent per multi_read request. The whole batch response is parsed into memory at once, so if a run fails with 'out of memory (exceeded 256M)' — most likely on Timecard Metrics or Accruals over a wide date range — lower this (e.g. to 25). It is the primary memory lever for rollup resources (Timecard Metrics, Accruals), which cannot be split by date the way per-event resources can with Window Chunk Size. Trade-off: fewer employees per request means more requests, so the run is slower. Leave empty for the per-resource default (Timecard Metrics and Punches 100; Accruals and most per-event resources 500; activity net-changes 50). Ignored by resources that are not employee-scoped (e.g. Persons, Business Structure)."
+      },
+      "propertyOrder": 43
+    },
     "payroll_query": {
       "type": "string",
       "format": "textarea",
