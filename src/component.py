@@ -200,10 +200,11 @@ class Component(ComponentBase):
             and resource.window_max_minutes == 0
         ):
             raise UserException(
-                f"'window_days' is not supported for resource '{resource.name}' — its rows do not "
-                "split cleanly into date sub-windows (period rollups return one total per employee; "
-                "net-change is a delta read). Remove Window Chunk Size (days) and use 'batch_size' "
-                "to control memory instead."
+                f"'window_days' is only supported for per-event resources; resource "
+                f"'{resource.name}' cannot be split into date sub-windows (it is a period rollup, a "
+                "net-change delta, or an org-level read, so it reads the whole range in one request). "
+                "Remove Window Chunk Size (days) — for a rollup resource (timecard metrics, accruals) "
+                "use 'batch_size' to control memory instead."
             )
         since_iso, until_iso = self._compute_window(resource)
         record_iter = self._record_source(resource, since_iso, until_iso)
@@ -403,11 +404,13 @@ class Component(ComponentBase):
     def _write_empty_table(self, resource: ResourceDef) -> tuple[int, list[str]]:
         """Write a header-only output table when a run yields no rows.
 
-        A full load that returns nothing must still replace its destination (the Load Type help
-        says full load "replaces it each run"), and a first run should leave an empty table that
-        downstream configs can bind to rather than nothing at all. The header is derived from the
-        effective primary key. A keyless resource has no schema to emit, so there we can only warn
-        that the destination's previous contents were kept.
+        The header is the resource's known column set — its effective primary key plus every column
+        seen on prior runs (sticky columns from state). When that set is non-empty the table is
+        written empty, so a full load still replaces its destination (the Load Type help says full
+        load "replaces it each run") and downstream configs keep a stable schema. Only when NOTHING
+        is known — no primary key AND no sticky columns (e.g. a keyless resource whose first run
+        returned nothing) — is there no schema to emit; there we leave the table unwritten and log
+        that the destination's previous contents were kept (we cannot create a schema-less table).
         """
         primary_key = effective_primary_key(resource, self._config.primary_key)
         is_incremental = self._effective_incremental(resource)

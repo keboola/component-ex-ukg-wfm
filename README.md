@@ -73,12 +73,14 @@ Incremental & windowing
 - **End Date (`until`)** optionally bounds the upper end (empty = the current run time). Because there
   is no watermark, an absolute End Date simply fetches the same `[since, until]` window each run. An
   inverted window (Start Date on or after End Date) fails fast with a clear error.
-- The window is split into sub-windows to respect service limits and cap memory — **≤365 days by
+- For **per-event resources** (schedules, shifts, timecards, leave, attendance, attestations) the
+  window is split into sub-windows to respect service limits and cap memory — **≤365 days by
   default**, or **`window_days`** when set (lower it to pull a large range in smaller pieces). Because
   WFM's `endDate` is inclusive, sub-windows are split so no calendar day is fetched twice.
-  `window_days` applies to **per-event resources only** (schedules, shifts, timecards, leave,
-  attendance, attestations); **rollup resources** (timecard metrics, accruals) return one total per
-  employee and reject it — control their memory with a smaller employee **`batch_size`** instead.
+- **Rollup resources** (timecard metrics, accruals) and **net-change** resources are **never**
+  date-split — they read the whole `[since, until]` range in a single request (a rollup returns one
+  total per employee, so splitting would corrupt it), regardless of range length. They reject
+  `window_days`; control their memory with a smaller employee **`batch_size`** instead.
 - Employee sets are chunked by each resource's per-call batch limit (≤500 for most, 100 for
   timecard-metrics/persons, 50 for activity net-changes), overridable per config with `batch_size`,
   and adaptively **halved on HTTP 413**.
