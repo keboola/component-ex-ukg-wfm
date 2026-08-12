@@ -84,9 +84,12 @@ Incremental & windowing
   and adaptively **halved on HTTP 413**.
 - Net-change resources currently run as a date-windowed full **replace** (like other keyless
   resources); true net-change delta is deferred until a resource gains a stable primary key.
-- A run that returns **no rows** writes a header-only table when the resource has a primary key (so a
-  full load still replaces its destination and downstream configs can bind to it); a keyless resource
-  logs that its previous contents were kept.
+- A run that returns **no rows** re-emits the resource's known column set — its primary key plus every
+  column seen on prior runs (persisted in state) — as a header-only table, so a full load still
+  replaces its destination (to empty) and downstream configs keep a stable schema. This applies to
+  full loads too, so a keyless full-replace resource that has emitted columns before now writes an
+  empty table rather than retaining stale contents. Only a keyless resource that has never emitted any
+  column has nothing to write, and there the destination's previous contents are kept.
 - **Incremental upsert requires a primary key.** A resource upserts incrementally only when a primary
   key exists — either its registry default or one supplied via the row's `primary_key` field. A
   registry-keyless resource with no user-supplied `primary_key` always runs full-replace
