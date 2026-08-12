@@ -169,7 +169,7 @@ def _alphabetized(elements: list[SelectElement]) -> list[SelectElement]:
 
 
 class Component(ComponentBase):
-    # state.json key holding the sticky per-resource column set (see _load_sticky_columns).
+    # state.json key holding the sticky per-output-table column set (see _load_sticky_columns).
     _STATE_COLUMNS_KEY = "schema_columns"
 
     def __init__(self) -> None:
@@ -219,21 +219,33 @@ class Component(ComponentBase):
         if row_count:
             logging.info("Extracted resource '%s': %s rows, %s columns.", resource.name, row_count, len(columns))
 
-    def _load_sticky_columns(self, resource: ResourceDef) -> list[str]:
-        """Every column emitted for this resource on prior runs, persisted in state.json.
+    def _output_name(self, resource: ResourceDef) -> str:
+        """Output table / sticky-state / column-picker name.
+
+        An exploded metrics resource keys each selected metric group to its own schema, so its table
+        is suffixed with the group (e.g. timekeeping_timecard_metrics_actual_totals) — distinct
+        metrics get distinct, schema-stable tables and coexist as separate rows. Every other resource
+        keeps its plain resource name.
+        """
+        if resource.explode and self._config.effective_select:
+            return f"{resource.name}_{self._config.effective_select[0].lower()}"
+        return resource.name
+
+    def _load_sticky_columns(self, name: str) -> list[str]:
+        """Every column emitted for this output table on prior runs, persisted in state.json.
 
         Storage rejects a load whose column set is NARROWER than the destination table's — for an
         incremental upsert AND for a full REPLACE into a native-typed table. The API exposes no fixed
         schema (columns are data-derived), so a run whose data omits an optional field would shrink
         the set and fail the load. We remember the columns and re-emit their union, so the schema
-        only ever grows (absent columns write empty). This state is per-row and unrelated to the
-        fetch window (which stays config-driven).
+        only ever grows (absent columns write empty). This state is per output table and unrelated to
+        the fetch window (which stays config-driven).
         """
         bucket = (self.get_state_file() or {}).get(self._STATE_COLUMNS_KEY)
-        cols = bucket.get(resource.name) if isinstance(bucket, dict) else None
+        cols = bucket.get(name) if isinstance(bucket, dict) else None
         return [str(c) for c in cols] if isinstance(cols, list) else []
 
-    def _extend_sticky_columns(self, resource: ResourceDef, seen_columns: list[str]) -> list[str]:
+    def _extend_sticky_columns(self, name: str, seen_columns: list[str]) -> list[str]:
         """Union this run's columns with the persisted set, persist the grown set, and return it.
 
         Single state read + write (other state keys preserved). See _load_sticky_columns for why.
@@ -242,10 +254,10 @@ class Component(ComponentBase):
         bucket = state.get(self._STATE_COLUMNS_KEY)
         if not isinstance(bucket, dict):
             bucket = {}
-        prior = bucket.get(resource.name)
+        prior = bucket.get(name)
         prior_cols = [str(c) for c in prior] if isinstance(prior, list) else []
         columns = sorted(set(seen_columns) | set(prior_cols))
-        bucket[resource.name] = columns
+        bucket[name] = columns
         state[self._STATE_COLUMNS_KEY] = bucket
         self.write_state_file(state)
         return columns
@@ -374,7 +386,8 @@ class Component(ComponentBase):
             # REPLACE whose column set is narrower than the destination's schema just as it rejects a
             # narrower incremental upsert (the "Missing columns: <field>" failure). A run that
             # legitimately returns few rows must not drop an optional column and break the table.
-            columns = self._extend_sticky_columns(resource, list(seen_columns))
+            output_name = self._output_name(resource)
+            columns = self._extend_sticky_columns(output_name, list(seen_columns))
             schema = {
                 col: ColumnDefinition(
                     data_types=BaseType(
@@ -390,7 +403,7 @@ class Component(ComponentBase):
             # Storage write mode: incremental upsert only with a stable PK (computed above); a
             # keyless resource with no user PK always full-REPLACEs.
             table = self.create_out_table_definition(
-                f"{resource.name}.csv",
+                f"{output_name}.csv",
                 primary_key=primary_key,
                 incremental=is_incremental,
                 has_header=True,
@@ -424,7 +437,8 @@ class Component(ComponentBase):
         """
         # PK resolved against the sticky columns so a prior uniqueId key (from an exploded resource)
         # is preserved even on a zero-row run.
-        sticky = self._load_sticky_columns(resource)
+        output_name = self._output_name(resource)
+        sticky = self._load_sticky_columns(output_name)
         primary_key = resolve_primary_key(resource, sticky, self._config.primary_key)
         is_incremental = self._config.incremental and bool(primary_key)
         # Re-emit the full accumulated column set (from state) so a zero-row run still matches the
@@ -450,7 +464,7 @@ class Component(ComponentBase):
             for col in header_cols
         }
         table = self.create_out_table_definition(
-            f"{resource.name}.csv",
+            f"{output_name}.csv",
             primary_key=primary_key,
             incremental=is_incremental,
             has_header=True,
@@ -542,7 +556,7 @@ class Component(ComponentBase):
                 "For now, type the primary-key column name(s) directly into the field."
             )
         resource = get_resource(self._config.resource)
-        table_id = default_output_table_id(env.component_id, env.config_id, resource.name)
+        table_id = default_output_table_id(env.component_id, env.config_id, self._output_name(resource))
         try:
             columns = get_table_columns(env.url, env.token, table_id)
         except Exception as exc:

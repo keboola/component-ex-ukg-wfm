@@ -203,9 +203,10 @@ def test_timecard_metrics_explodes_to_line_items_keyed_on_uniqueid(tmp_path, mon
     row_count, columns = component._stream_and_write_table(resource, records)
 
     assert row_count == 2
-    manifest = _manifest(tmp_path / "data", "timekeeping_timecard_metrics")
+    # metric_group="ACTUAL_TOTALS" -> the exploded output table is named per metric group.
+    manifest = _manifest(tmp_path / "data", "timekeeping_timecard_metrics_actual_totals")
     assert manifest["incremental"] is True
-    cols = _schema_by_col(tmp_path / "data", "timekeeping_timecard_metrics")
+    cols = _schema_by_col(tmp_path / "data", "timekeeping_timecard_metrics_actual_totals")
     assert cols["uniqueId"]["primary_key"] is True
     assert cols["uniqueId"].get("nullable", False) is False
     assert {"uniqueId", "employeeId_id", "applyDate", "hoursAmount"} <= set(cols)
