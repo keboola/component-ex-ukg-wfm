@@ -54,7 +54,11 @@ jobs:
           MAX_COMMENTS: 10
           MIN_COMMENT_SEVERITY: minor
 
-          EXCLUDE_PATTERNS: "**/*.lock"
+          # Exclude the volume-heavy VCR test fixtures (recorded cassettes, generated expected
+          # output tables, output snapshots) — they are data, not code, and a large regenerated
+          # set blows the model's input-token limit (a 400 "input token count exceeds ..." error).
+          # component_config/*.json schemas are deliberately NOT excluded — those are reviewable.
+          EXCLUDE_PATTERNS: "**/*.lock,tests/functional/**/cassettes/**,tests/functional/**/expected/**,tests/functional/**/output_snapshot.json"
 
       - name: Remove ai-review label after re-trigger
         if: always() && github.event.action == 'labeled' && github.event.label.name == 'ai-review'
