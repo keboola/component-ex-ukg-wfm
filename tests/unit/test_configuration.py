@@ -108,3 +108,23 @@ def test_legacy_config_without_window_type_keeps_symbolic_period():
 def test_symbolic_mode_without_a_period_resolves_to_none():
     cfg = Configuration(**_root(), resource="persons", window_type="symbolic_period")
     assert cfg.effective_symbolic_period is None
+
+
+def test_window_days_at_upper_bound_accepted():
+    cfg = Configuration(**_root(), resource="persons", window_days=365)
+    assert cfg.window_days == 365
+
+
+def test_window_days_at_lower_bound_accepted():
+    cfg = Configuration(**_root(), resource="persons", window_days=1)
+    assert cfg.window_days == 1
+
+
+def test_window_days_above_upper_bound_raises_userexception():
+    with pytest.raises(UserException):
+        Configuration(**_root(), resource="persons", window_days=366)
+
+
+def test_window_days_far_above_upper_bound_raises_userexception():
+    with pytest.raises(UserException):
+        Configuration(**_root(), resource="persons", window_days=1000)

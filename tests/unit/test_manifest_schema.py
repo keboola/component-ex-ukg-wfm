@@ -247,6 +247,35 @@ def test_timecard_metrics_explodes_to_line_items_keyed_on_uniqueid(tmp_path, mon
     assert {"uniqueId", "employeeId_id", "applyDate", "hoursAmount"} <= set(cols)
 
 
+def test_zero_row_full_load_warns_about_replacing_destination(tmp_path, monkeypatch, caplog):
+    """A zero-row full load replaces the destination table with an empty header-only one — a
+    transient empty API response would silently truncate previously loaded data. It must warn."""
+    params = {**_PARAMS, "resource": "persons", "load_type": "full_load"}
+    component = _build_component(tmp_path, monkeypatch, params)
+    resource = get_resource("persons")
+
+    with caplog.at_level("WARNING"):
+        row_count, columns = component._write_empty_table(resource)
+
+    assert row_count == 0
+    assert columns  # known columns (the primary key) -> the header-only path, not the no-schema path
+    assert any("persons" in record.message and "full load" in record.message.lower() for record in caplog.records)
+
+
+def test_zero_row_incremental_load_does_not_warn(tmp_path, monkeypatch, caplog):
+    """A zero-row incremental run is a no-op append, not a truncation — it must not warn."""
+    params = {**_PARAMS, "resource": "persons", "load_type": "incremental_load"}
+    component = _build_component(tmp_path, monkeypatch, params)
+    resource = get_resource("persons")
+
+    with caplog.at_level("WARNING"):
+        row_count, columns = component._write_empty_table(resource)
+
+    assert row_count == 0
+    assert columns
+    assert not any(record.levelname == "WARNING" for record in caplog.records)
+
+
 def test_composite_pk_all_key_columns_non_nullable(component, tmp_path):
     """Every column in a composite primary key must be non-nullable."""
     resource = ResourceDef(

@@ -273,8 +273,10 @@ class Component(ComponentBase):
         to the run start when empty (resolve_window); `since` has no natural default. An empty Start
         Date is therefore rejected up front — otherwise the request would ship with no dateRange and
         WFM would silently return its default period (a near-empty result that then fails the output
-        schema check). An inverted window (Start on/after End) is rejected for the same reason: it
-        would yield an empty pull that reads as "the End Date parameter is broken".
+        schema check). WFM's `dateRange.endDate` is INCLUSIVE and the API bounds are truncated to a
+        calendar date, so a same-day window (Start == End) is a valid one-day pull; only a Start date
+        strictly AFTER the End date's calendar day is rejected — that would yield an empty pull that
+        reads as "the End Date parameter is broken".
         """
         if self._config.effective_symbolic_period or not resource.date_field:
             return None, None
@@ -286,10 +288,13 @@ class Component(ComponentBase):
                 "switch Date Selection to a Symbolic Period."
             )
         # until_iso is always set (resolve_window defaults the upper bound to the run start).
-        if since_iso >= until_iso:
+        # Compare CALENDAR DATES, not full timestamps: a same-day window (Start == End) is valid
+        # (the API truncates to a calendar date and endDate is inclusive), so only a Start date
+        # whose calendar day is strictly after the End date's is an inverted window.
+        if since_iso[:10] > until_iso[:10]:
             raise UserException(
-                f"Start Date ({since_iso}) must be earlier than End Date ({until_iso}) for resource "
-                f"'{resource.name}'. Adjust the window so Start comes before End."
+                f"Start Date ({since_iso}) must be on or before End Date ({until_iso}) for resource "
+                f"'{resource.name}'. Adjust the window so Start does not come after End."
             )
         return since_iso, until_iso
 
@@ -521,6 +526,17 @@ class Component(ComponentBase):
         with open(table.full_path, "w", encoding="utf-8", newline="") as fh:
             csv.DictWriter(fh, fieldnames=header_cols).writeheader()
         self.write_manifest(table)
+        if not is_incremental:
+            # A full load's header-only table REPLACES the destination's previous contents with
+            # nothing — a transient empty API response (rather than a genuinely empty resource)
+            # would silently truncate real data with no other signal. An incremental zero-row run
+            # is a no-op append, not a truncation, so it does not warn.
+            logging.warning(
+                "No rows returned for resource '%s' on a full load; replacing the output table with "
+                "an empty (header-only) one. This will truncate any previously loaded data — check "
+                "for an unexpected empty API response if this is not expected.",
+                resource.name,
+            )
         logging.info(
             "No rows returned for resource '%s'; wrote a header-only table with columns %s.",
             resource.name,
