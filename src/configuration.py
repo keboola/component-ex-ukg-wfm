@@ -55,9 +55,11 @@ class Configuration(BaseModel):
     # load-bearing (accruals, attestations, work / net-change) a user override silently broke the
     # read. Kept for back-compat / raw-JSON power users; empty = the resource's registry default.
     select: list[str] = Field(default_factory=list)
-    # Timecard-metrics-only picker: the API `select` groups chosen from the static enum dropdown (a
-    # separate row-schema field so it shows only for that resource). Folded into the effective select
-    # below; for timecard_metrics `metric_groups` is authoritative (any `select` is ignored).
+    # Timecard-metrics-only picker: the ONE metric group (API `select` token) chosen from the static
+    # single-select dropdown. Authoritative for timecard_metrics' effective select. `metric_groups`
+    # is retained only to fold a pre-explode (multi-select) config to its first element; new configs
+    # use metric_group.
+    metric_group: str | None = None
     metric_groups: list[str] = Field(default_factory=list)
     # User-supplied primary key for the output table. Overrides the resource registry default and,
     # on incremental load, enables upsert even for a registry-keyless resource.
@@ -104,11 +106,16 @@ class Configuration(BaseModel):
     @computed_field
     @property
     def effective_select(self) -> list[str]:
-        """API `select` groups. For timecard_metrics the metric-group picker (`metric_groups`) is
-        authoritative, so a stale or raw-JSON `select` must not override it. Empty picker = all
-        sections. Every other resource falls back to `select` (no longer a UI field; empty for
-        UI-built configs, so the resource's registry default applies).
+        """API `select` groups. For timecard_metrics the single metric-group picker (`metric_group`)
+        is authoritative; a stale/raw `select` must not override it, and a legacy multi-value
+        `metric_groups` folds to its first element (back-compat). An empty picker yields an empty
+        select — the component rejects that for timecard_metrics (it needs exactly one section to
+        explode). Every other resource falls back to the free-text `select`.
         """
         if self.resource == "timekeeping_timecard_metrics":
-            return self.metric_groups
+            if self.metric_group:
+                return [self.metric_group]
+            if self.metric_groups:
+                return [self.metric_groups[0]]
+            return []
         return self.select

@@ -35,35 +35,49 @@ def test_missing_host_raises_userexception():
         Configuration(**data, resource="persons")
 
 
-def test_effective_select_folds_metric_groups():
-    # The timecard-metrics picker (metric_groups) feeds the API select when set.
-    cfg = Configuration(**_root(), resource="timekeeping_timecard_metrics", metric_groups=["ACTUAL_TOTALS"])
+def test_effective_select_uses_single_metric_group():
+    cfg = Configuration(**_root(), resource="timekeeping_timecard_metrics", metric_group="ACTUAL_TOTALS")
     assert cfg.effective_select == ["ACTUAL_TOTALS"]
 
 
-def test_non_metrics_resource_uses_free_text_select():
-    # Every non-metrics resource uses the free-text `select`; metric_groups is irrelevant there.
-    cfg = Configuration(**_root(), resource="persons", select=["FOO"], metric_groups=["ACTUAL_TOTALS"])
-    assert cfg.effective_select == ["FOO"]
-
-
-def test_metric_groups_wins_over_stale_select_for_timecard_metrics():
-    # Regression: a stale/hidden `select` on the timecard_metrics row must NOT override the picker.
+def test_legacy_metric_groups_folds_to_first_element():
+    # Back-compat: a pre-explode config stored a list; use its first element.
     cfg = Configuration(
         **_root(),
         resource="timekeeping_timecard_metrics",
-        select=["SCHEDULED_TOTALS", "PROJECTED_TOTALS"],  # stale leftover, hidden for this resource
-        metric_groups=["ACTUAL_TOTALS"],
+        metric_groups=["ACTUAL_TOTALS", "SCHEDULED_TOTALS"],
     )
     assert cfg.effective_select == ["ACTUAL_TOTALS"]
 
 
-def test_empty_metric_groups_means_all_sections_ignoring_stale_select():
-    # Empty picker on timecard_metrics = all sections; a stale `select` must not leak back in.
+def test_metric_group_wins_over_stale_select():
     cfg = Configuration(
-        **_root(), resource="timekeeping_timecard_metrics", select=["SCHEDULED_TOTALS"], metric_groups=[]
+        **_root(),
+        resource="timekeeping_timecard_metrics",
+        select=["SCHEDULED_TOTALS"],  # stale/hidden leftover
+        metric_group="ACTUAL_TOTALS",
     )
+    assert cfg.effective_select == ["ACTUAL_TOTALS"]
+
+
+def test_metric_group_wins_over_legacy_metric_groups():
+    cfg = Configuration(
+        **_root(),
+        resource="timekeeping_timecard_metrics",
+        metric_group="ACTUAL_TOTALS",
+        metric_groups=["SCHEDULED_TOTALS"],
+    )
+    assert cfg.effective_select == ["ACTUAL_TOTALS"]
+
+
+def test_empty_metric_group_yields_empty_select():
+    cfg = Configuration(**_root(), resource="timekeeping_timecard_metrics")
     assert cfg.effective_select == []
+
+
+def test_non_metrics_resource_uses_free_text_select():
+    cfg = Configuration(**_root(), resource="persons", select=["FOO"], metric_group="ACTUAL_TOTALS")
+    assert cfg.effective_select == ["FOO"]
 
 
 def test_effective_select_empty_by_default():

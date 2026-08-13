@@ -118,24 +118,6 @@
     }
   },
   {
-    "name": "08_timekeeping_timecard_metrics",
-    "description": "Extract 'timekeeping_timecard_metrics' (windowed) — returns rows",
-    "config": {
-      "action": "run",
-      "parameters": {
-        "host": "https://acme.prd.mykronos.com",
-        "client_id": "DUMMY_CLIENT_ID",
-        "#client_secret": "DUMMY_CLIENT_SECRET",
-        "username": "DUMMY_USER",
-        "#password": "DUMMY_PASSWORD",
-        "resource": "timekeeping_timecard_metrics",
-        "hyperfind_ref": "253",
-        "load_type": "incremental_load",
-        "since": "2026-04-21T00:00:00+00:00"
-      }
-    }
-  },
-  {
     "name": "09_scheduling_schedules",
     "description": "Extract 'scheduling_schedules' (windowed, scheduleDayList envelope) — returns rows",
     "config": {
@@ -485,28 +467,6 @@
     }
   },
   {
-    "name": "29_timecard_metrics_symbolic_threshold",
-    "description": "Parity with the customer prod row: timecard_metrics, broad hyperfind_ref=1 + hyperfind_threshold=50000 + symbolic_period id 1 (Current Pay Period), empty since. Proves the threshold clears the Hyperfind AND that the symbolic period is sent as dateRange.symbolicPeriod.id → 200.",
-    "config": {
-      "action": "run",
-      "parameters": {
-        "host": "https://acme.prd.mykronos.com",
-        "client_id": "DUMMY_CLIENT_ID",
-        "#client_secret": "DUMMY_CLIENT_SECRET",
-        "username": "DUMMY_USER",
-        "#password": "DUMMY_PASSWORD",
-        "resource": "timekeeping_timecard_metrics",
-        "load_type": "full_load",
-        "since": "",
-        "hyperfind_ref": "1",
-        "hyperfind_threshold": 50000,
-        "symbolic_period": "1",
-        "poll_interval_seconds": 15,
-        "max_wait_seconds": 1800
-      }
-    }
-  },
-  {
     "name": "30_listSymbolicPeriods",
     "description": "Sync action list_symbolic_periods: list the tenant's symbolic periods (GET /commons/symbolicperiod) for the Symbolic Period dropdown.",
     "config": {
@@ -522,7 +482,7 @@
   },
   {
     "name": "32_timecard_metrics_selected_actual_totals",
-    "description": "timecard_metrics with metric_groups=[ACTUAL_TOTALS] (the picker field): proves the picked group folds into the API select so the response is ONLY actualTotals — targeted, memory-lean.",
+    "description": "timecard_metrics with metric_group=ACTUAL_TOTALS (the single-select picker): proves the picked group folds into the API select so the response is ONLY actualTotals — targeted, memory-lean — and that the component explodes that section into one output row per line item, keyed on uniqueId.",
     "config": {
       "action": "run",
       "parameters": {
@@ -537,7 +497,7 @@
         "hyperfind_ref": "1",
         "hyperfind_threshold": 50000,
         "symbolic_period": "1",
-        "metric_groups": ["ACTUAL_TOTALS"],
+        "metric_group": "ACTUAL_TOTALS",
         "poll_interval_seconds": 15,
         "max_wait_seconds": 1800
       }

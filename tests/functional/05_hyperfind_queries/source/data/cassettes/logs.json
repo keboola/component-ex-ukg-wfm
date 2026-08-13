@@ -17,6 +17,12 @@
     {
       "level": "INFO",
       "logger": "root",
+      "message": "Resource 'hyperfind_queries': 25 rows (fetch 0.0s, process+write 0.0s, phase2 0.0s).",
+      "timestamp": "2026-07-23T17:18:54.000Z"
+    },
+    {
+      "level": "INFO",
+      "logger": "root",
       "message": "Extracted resource 'hyperfind_queries': 25 rows, 8 columns.",
       "timestamp": "2026-07-23T17:18:54.000Z"
     }

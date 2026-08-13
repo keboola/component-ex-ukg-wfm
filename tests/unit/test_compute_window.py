@@ -115,3 +115,25 @@ def test_window_days_refused_for_rollup_resource():
     )
     with pytest.raises(UserException, match="window_days"):
         comp.run()
+
+
+def test_empty_metric_group_refused_for_timecard_metrics():
+    # An exploded metrics resource needs exactly one section; an empty selection would return ALL
+    # sections (not explodable into one table), so run() must fail fast before any API call.
+    comp = _comp(resource="timekeeping_timecard_metrics", since="2026-01-01T00:00:00+00:00")
+    with pytest.raises(UserException, match="metric group"):
+        comp.run()
+
+
+def test_metric_group_set_passes_the_guard(monkeypatch):
+    # With a metric_group set, run() passes the guard and proceeds to fetch (which we stub to no-op).
+    comp = _comp(
+        resource="timekeeping_timecard_metrics",
+        since="2026-01-01T00:00:00+00:00",
+        metric_group="ACTUAL_TOTALS",
+    )
+    monkeypatch.setattr(comp, "_record_source", lambda *a, **k: iter([]))  # short-circuit before HTTP
+    # comp bypasses __init__ (see _comp), so it has no data_folder_path; stub the state read the
+    # zero-row path takes so the guard is exercised without needing a real datadir.
+    monkeypatch.setattr(comp, "get_state_file", lambda: {})
+    comp.run()  # must not raise
