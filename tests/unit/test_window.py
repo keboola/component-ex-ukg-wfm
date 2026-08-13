@@ -70,6 +70,26 @@ def test_calendar_end_before_start_returns_empty():
     assert split_date_windows(start, end, max_days=365) == []
 
 
+def test_calendar_end_date_before_start_date_returns_empty_even_with_time_of_day():
+    # Same as above but gated on .date(), not the full datetime — Aug 14 -> Aug 13 must still be []
+    # regardless of the time-of-day component.
+    start = datetime(2026, 8, 14, 6, 0, tzinfo=UTC)
+    end = datetime(2026, 8, 13, 20, 0, tzinfo=UTC)
+    assert split_date_windows(start, end, max_days=365) == []
+
+
+def test_calendar_same_day_window_with_mismatched_time_of_day_returns_single_window():
+    # Regression: since/until are parsed independently (until before since — see resolve_window),
+    # so a same-calendar-day window can have `end` earlier than `start` as a full timestamp (e.g.
+    # Start="today", End="today" resolved a few microseconds apart, or an explicit Start=...T18:00,
+    # End=...T00:00 on one date) despite covering exactly one valid calendar day. The calendar branch
+    # must gate on .date(), not the full datetime, or this wrongly returns [] for window_chunkable
+    # (per-event) resources on their single-day case.
+    start = datetime(2026, 8, 13, 18, 0, tzinfo=UTC)
+    end = datetime(2026, 8, 13, 0, 0, tzinfo=UTC)
+    assert split_date_windows(start, end, max_days=365) == [(start, end)]
+
+
 def test_minute_window_same_start_and_end_returns_empty():
     # The minute branch keeps the original "nothing to fetch" behaviour for a zero-length window.
     moment = datetime(2026, 1, 1, tzinfo=UTC)

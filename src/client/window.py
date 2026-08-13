@@ -69,10 +69,17 @@ def split_date_windows(
     before the next begins, so every calendar day is fetched exactly once (the final window keeps the
     real end). Callers truncate these bounds to a calendar date (see orchestration._as_date).
 
-    A same-day calendar window (end == start) is a valid single-day pull (the inclusive endDate means
-    Start == End covers exactly that one day) and returns the single window [(start, end)] rather than
-    entering the day-splitting loop below (which requires `cursor < end` to make progress). The minute
-    branch has no such case: a zero-length minute window has nothing to fetch, so it still returns [].
+    A same CALENDAR-DAY window (end.date() == start.date()) is a valid single-day pull (the inclusive
+    endDate means Start == End covers exactly that one day) and returns the single window
+    [(start, end)] rather than entering the day-splitting loop below (which requires `cursor < end`
+    to make progress). The calendar branch gates on CALENDAR DATES, not full datetimes: callers
+    (_compute_window) accept same-day windows purely by calendar date, and `since`/`until` are parsed
+    independently (until first, then since — see resolve_window), so a same-day window can have `end`
+    a few microseconds before `start` as full timestamps (e.g. Start="today", End="today", or an
+    explicit Start=...T18:00, End=...T00:00 on one date) despite covering exactly one valid calendar
+    day. Gating on `end < start` (full datetime) would wrongly return [] for that case. The minute
+    branch has no such mismatch (it consumes the raw timestamps directly, not a calendar day), so it
+    keeps the original full-datetime check: a zero-length minute window has nothing to fetch.
     """
     if max_minutes > 0:
         if end <= start:
@@ -86,9 +93,9 @@ def split_date_windows(
             cursor = nxt
         return windows
     # Calendar-day chunking with an inclusive endDate: end each non-final window a day early.
-    if end < start:
+    if end.date() < start.date():
         return []
-    if end == start:
+    if end.date() == start.date():
         return [(start, end)]
     span = timedelta(days=max_days)
     windows = []
