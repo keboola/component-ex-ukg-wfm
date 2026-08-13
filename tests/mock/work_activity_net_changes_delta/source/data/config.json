@@ -7,6 +7,7 @@
     "#password": "pw",
     "resource": "work_activity_net_changes",
     "load_type": "incremental_load",
+    "since": "2026-04-21T00:00:00+00:00",
     "hyperfind_ref": "AllHome"
   }
 }

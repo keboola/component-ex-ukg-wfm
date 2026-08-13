@@ -29,6 +29,12 @@ class Configuration(BaseModel):
     since: str | None = None
     # Optional upper bound of the fetch window; empty = now (run start).
     until: str | None = None
+    # Max span (in days) of each date sub-window when a [Start, End] pull is chunked. Lower it to
+    # fetch a large window in smaller pieces so peak memory stays under the component limit — each
+    # sub-window is a separate request whose response is parsed on its own. Empty = the per-resource
+    # default (365 days). Ignored by punch-level resources, which always use their own minute cap,
+    # and by non-date-windowed resources.
+    window_days: int | None = Field(default=None, ge=1, le=365)
     # UI discriminator for how the fetch window is chosen: "date_window" (Start/End Date) or
     # "symbolic_period" (a rolling UKG period). It gates which fields the form shows AND is
     # authoritative in code (see effective_symbolic_period) so a hidden, stale symbolic_period value

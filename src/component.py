@@ -188,6 +188,24 @@ class Component(ComponentBase):
         if self._config.resource is None:
             raise UserException("'resource' is required. Configure a resource row.")
         resource = get_resource(self._config.resource)
+        # window_days chunks a date range into per-sub-window requests. That only makes sense for
+        # per-event resources; for a period-rollup resource (timecard_metrics, accruals) it would
+        # split the single per-employee aggregate row into partial-period rows, so refuse it here
+        # with a clear pointer to the right memory lever. (Punch resources chunk by their own minute
+        # cap, so window_days is simply ignored there — see iter_records.)
+        if (
+            self._config.window_days
+            and resource.date_field
+            and not resource.window_chunkable
+            and resource.window_max_minutes == 0
+        ):
+            raise UserException(
+                f"'window_days' is only supported for per-event resources; resource "
+                f"'{resource.name}' cannot be split into date sub-windows (it is a period rollup, a "
+                "net-change delta, or an org-level read, so it reads the whole range in one request). "
+                "Remove Window Chunk Size (days) — for a rollup resource (timecard metrics, accruals) "
+                "use 'batch_size' to control memory instead."
+            )
         since_iso, until_iso = self._compute_window(resource)
         record_iter = self._record_source(resource, since_iso, until_iso)
         row_count, columns = self._stream_and_write_table(resource, record_iter)
@@ -201,13 +219,14 @@ class Component(ComponentBase):
         return effective_incremental(resource, self._config.incremental, self._config.primary_key)
 
     def _load_sticky_columns(self, resource: ResourceDef) -> list[str]:
-        """Every column emitted for this resource on prior incremental runs, persisted in state.json.
+        """Every column emitted for this resource on prior runs, persisted in state.json.
 
-        Incremental load appends to the existing table and Storage rejects a load whose column set is
-        NARROWER than that table's. The API exposes no fixed schema (columns are data-derived), so a
-        run whose data omits an optional field would shrink the set and fail the upsert. We remember
-        the columns and re-emit their union, so the schema only ever grows (absent columns write
-        empty). This state is per-row and unrelated to the fetch window (which stays config-driven).
+        Storage rejects a load whose column set is NARROWER than the destination table's — for an
+        incremental upsert AND for a full REPLACE into a native-typed table. The API exposes no fixed
+        schema (columns are data-derived), so a run whose data omits an optional field would shrink
+        the set and fail the load. We remember the columns and re-emit their union, so the schema
+        only ever grows (absent columns write empty). This state is per-row and unrelated to the
+        fetch window (which stays config-driven).
         """
         bucket = (self.get_state_file() or {}).get(self._STATE_COLUMNS_KEY)
         cols = bucket.get(resource.name) if isinstance(bucket, dict) else None
@@ -235,17 +254,33 @@ class Component(ComponentBase):
 
         There is no state watermark: the window is recomputed from config every run. A symbolic
         period replaces the date window, and a resource with no date field has no window at all.
+
+        A date-windowed resource needs BOTH bounds to build a valid WFM dateRange. `until` defaults
+        to the run start when empty (resolve_window); `since` has no natural default. An empty Start
+        Date is therefore rejected up front — otherwise the request would ship with no dateRange and
+        WFM would silently return its default period (a near-empty result that then fails the output
+        schema check). WFM's `dateRange.endDate` is INCLUSIVE and the API bounds are truncated to a
+        calendar date, so a same-day window (Start == End) is a valid one-day pull; only a Start date
+        strictly AFTER the End date's calendar day is rejected — that would yield an empty pull that
+        reads as "the End Date parameter is broken".
         """
         if self._config.effective_symbolic_period or not resource.date_field:
             return None, None
         since_iso, until_iso = resolve_window(self._config.since, self._config.until)
-        if since_iso and until_iso and since_iso >= until_iso:
-            logging.warning(
-                "Fetch window for resource '%s' is empty: Start Date %s is not before End Date %s; "
-                "no rows will be returned.",
-                resource.name,
-                since_iso,
-                until_iso,
+        if since_iso is None:
+            raise UserException(
+                f"Resource '{resource.name}' needs a Start Date (the lower bound of the fetch "
+                "window). Set a Start Date — optionally with an End Date to bound the pull — or "
+                "switch Date Selection to a Symbolic Period."
+            )
+        # until_iso is always set (resolve_window defaults the upper bound to the run start).
+        # Compare CALENDAR DATES, not full timestamps: a same-day window (Start == End) is valid
+        # (the API truncates to a calendar date and endDate is inclusive), so only a Start date
+        # whose calendar day is strictly after the End date's is an inverted window.
+        if since_iso[:10] > until_iso[:10]:
+            raise UserException(
+                f"Start Date ({since_iso}) must be on or before End Date ({until_iso}) for resource "
+                f"'{resource.name}'. Adjust the window so Start does not come after End."
             )
         return since_iso, until_iso
 
@@ -275,6 +310,7 @@ class Component(ComponentBase):
             max_pages=self._config.max_pages,
             hyperfind_threshold=self._config.hyperfind_threshold,
             batch_size=self._config.batch_size,
+            window_days=self._config.window_days,
         )
 
     def _stream_and_write_table(
@@ -326,14 +362,14 @@ class Component(ComponentBase):
             # Effective PK = the user-supplied primary_key if set, else the resource registry default.
             primary_key = effective_primary_key(resource, self._config.primary_key)
             is_incremental = self._effective_incremental(resource)
-            # Sticky schema on incremental load: union this run's columns with every column seen
-            # before (state.json) so the set never shrinks below the existing table, then persist the
-            # grown set. Columns absent this run are written empty (restval=''). A full load replaces
-            # the table, so its schema may vary freely and needs no state.
-            if is_incremental:
-                columns = self._extend_sticky_columns(resource, list(seen_columns))
-            else:
-                columns = sorted(seen_columns)
+            # Sticky schema: union this run's columns with every column seen before (state.json) so
+            # the set never shrinks below the existing table, then persist the grown set. Columns
+            # absent this run are written empty (restval=''). This applies to full loads too, not
+            # just incremental: the output table is always native-typed, and Storage rejects a full
+            # REPLACE whose column set is narrower than the destination's schema just as it rejects a
+            # narrower incremental upsert (the "Missing columns: <field>" failure). A run that
+            # legitimately returns few rows must not drop an optional column and break the table.
+            columns = self._extend_sticky_columns(resource, list(seen_columns))
             schema = {
                 col: ColumnDefinition(
                     data_types=BaseType(
@@ -373,18 +409,21 @@ class Component(ComponentBase):
     def _write_empty_table(self, resource: ResourceDef) -> tuple[int, list[str]]:
         """Write a header-only output table when a run yields no rows.
 
-        A full load that returns nothing must still replace its destination (the Load Type help
-        says full load "replaces it each run"), and a first run should leave an empty table that
-        downstream configs can bind to rather than nothing at all. The header is derived from the
-        effective primary key. A keyless resource has no schema to emit, so there we can only warn
-        that the destination's previous contents were kept.
+        The header is the resource's known column set — its effective primary key plus every column
+        seen on prior runs (sticky columns from state). When that set is non-empty the table is
+        written empty, so a full load still replaces its destination (the Load Type help says full
+        load "replaces it each run") and downstream configs keep a stable schema. Only when NOTHING
+        is known — no primary key AND no sticky columns (e.g. a keyless resource whose first run
+        returned nothing) — is there no schema to emit; there we leave the table unwritten and log
+        that the destination's previous contents were kept (we cannot create a schema-less table).
         """
         primary_key = effective_primary_key(resource, self._config.primary_key)
         is_incremental = self._effective_incremental(resource)
-        # On incremental load, re-emit the full accumulated column set (from state) so a zero-row run
-        # still matches the existing table's schema, with PK columns as the anchor. A keyless full
-        # load has no schema to emit, so keep the destination's previous contents.
-        sticky = self._load_sticky_columns(resource) if is_incremental else []
+        # Re-emit the full accumulated column set (from state) so a zero-row run still matches the
+        # existing table's schema, with PK columns as the anchor. Applies to full loads too: a
+        # native-typed table rejects a REPLACE with a narrower column set. A keyless resource with no
+        # columns ever seen has no schema to emit, so we keep the destination's previous contents.
+        sticky = self._load_sticky_columns(resource)
         header_cols = sorted(set(primary_key) | set(sticky))
         if not header_cols:
             logging.info(
@@ -413,6 +452,17 @@ class Component(ComponentBase):
         with open(table.full_path, "w", encoding="utf-8", newline="") as fh:
             csv.DictWriter(fh, fieldnames=header_cols).writeheader()
         self.write_manifest(table)
+        if not is_incremental:
+            # A full load's header-only table REPLACES the destination's previous contents with
+            # nothing — a transient empty API response (rather than a genuinely empty resource)
+            # would silently truncate real data with no other signal. An incremental zero-row run
+            # is a no-op append, not a truncation, so it does not warn.
+            logging.warning(
+                "No rows returned for resource '%s' on a full load; replacing the output table with "
+                "an empty (header-only) one. This will truncate any previously loaded data — check "
+                "for an unexpected empty API response if this is not expected.",
+                resource.name,
+            )
         logging.info(
             "No rows returned for resource '%s'; wrote a header-only table with columns %s.",
             resource.name,

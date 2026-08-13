@@ -36,9 +36,75 @@ def test_split_over_max_chunks_by_max_days():
     assert len(windows) == 3
     assert windows[0][0] == start
     assert windows[-1][1] == end
-    # contiguous, non-overlapping
+    # Calendar-day windows: WFM endDate is inclusive, so each non-final window ends the day BEFORE
+    # the next begins (no shared boundary day => no duplicate rows), and they leave no calendar gap.
     for prev, nxt in zip(windows, windows[1:], strict=False):
-        assert prev[1] == nxt[0]
+        assert prev[1] < nxt[0]  # not contiguous in datetime...
+        assert nxt[0].date() - prev[1].date() == timedelta(days=1)  # ...but adjacent by one calendar day
+
+
+def test_day_windows_do_not_share_a_boundary_day():
+    # Regression: with an inclusive endDate, contiguous windows would fetch the boundary day twice
+    # (duplicate rows for keyless resources). Adjacent windows must not share a calendar date.
+    start = datetime(2026, 1, 1, tzinfo=UTC)
+    end = datetime(2026, 4, 1, tzinfo=UTC)  # 90 days
+    windows = split_date_windows(start, end, max_days=30)
+    assert len(windows) == 3
+    end_dates = {w[1].date() for w in windows}
+    start_dates = {w[0].date() for w in windows}
+    assert end_dates.isdisjoint(start_dates)  # no day is both an end and a start
+    assert windows[0][0] == start
+    assert windows[-1][1] == end
+
+
+def test_calendar_same_day_window_returns_single_window():
+    # Regression: Start == End is a valid one-day pull (WFM's calendar dateRange.endDate is
+    # inclusive) and must return that single day, not be dropped by the end<=start short-circuit.
+    day = datetime(2026, 8, 13, tzinfo=UTC)
+    assert split_date_windows(day, day, max_days=365) == [(day, day)]
+
+
+def test_calendar_end_before_start_returns_empty():
+    start = datetime(2026, 8, 13, tzinfo=UTC)
+    end = datetime(2026, 8, 12, tzinfo=UTC)
+    assert split_date_windows(start, end, max_days=365) == []
+
+
+def test_calendar_end_date_before_start_date_returns_empty_even_with_time_of_day():
+    # Same as above but gated on .date(), not the full datetime — Aug 14 -> Aug 13 must still be []
+    # regardless of the time-of-day component.
+    start = datetime(2026, 8, 14, 6, 0, tzinfo=UTC)
+    end = datetime(2026, 8, 13, 20, 0, tzinfo=UTC)
+    assert split_date_windows(start, end, max_days=365) == []
+
+
+def test_calendar_same_day_window_with_mismatched_time_of_day_returns_single_window():
+    # Regression: since/until are parsed independently (until before since — see resolve_window),
+    # so a same-calendar-day window can have `end` earlier than `start` as a full timestamp (e.g.
+    # Start="today", End="today" resolved a few microseconds apart, or an explicit Start=...T18:00,
+    # End=...T00:00 on one date) despite covering exactly one valid calendar day. The calendar branch
+    # must gate on .date(), not the full datetime, or this wrongly returns [] for window_chunkable
+    # (per-event) resources on their single-day case.
+    start = datetime(2026, 8, 13, 18, 0, tzinfo=UTC)
+    end = datetime(2026, 8, 13, 0, 0, tzinfo=UTC)
+    assert split_date_windows(start, end, max_days=365) == [(start, end)]
+
+
+def test_minute_window_same_start_and_end_returns_empty():
+    # The minute branch keeps the original "nothing to fetch" behaviour for a zero-length window.
+    moment = datetime(2026, 1, 1, tzinfo=UTC)
+    assert split_date_windows(moment, moment, max_minutes=60) == []
+
+
+def test_minute_windows_stay_contiguous():
+    # Punch minute-cap windows keep the original contiguous half-open datetime behaviour.
+    start = datetime(2026, 1, 1, 0, 0, tzinfo=UTC)
+    end = datetime(2026, 1, 1, 2, 30, tzinfo=UTC)  # 150 minutes
+    windows = split_date_windows(start, end, max_minutes=60)
+    assert len(windows) == 3
+    for prev, nxt in zip(windows, windows[1:], strict=False):
+        assert prev[1] == nxt[0]  # contiguous
+    assert windows[-1][1] == end
 
 
 def test_resolve_window_uses_since_and_until_verbatim():

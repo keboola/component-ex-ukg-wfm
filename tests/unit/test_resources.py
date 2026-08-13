@@ -136,3 +136,52 @@ def test_hyperfind_scope_resources_flagged():
 def test_unknown_resource_raises():
     with pytest.raises(UserException):
         get_resource("does_not_exist")
+
+
+# Per-event, calendar-date resources may be date-chunked (window_days); rollup / minute-cap /
+# net-change / org-snapshot resources may not. Classification is derived from body_style +
+# incremental_style + window_max_minutes (see ResourceDef.window_chunkable).
+_CHUNKABLE = {
+    "timekeeping_timecards",
+    "scheduling_schedules",
+    "scheduling_shifts",
+    "scheduling_open_shifts",
+    "scheduling_swaps",
+    "leave_cases",
+    "leave_edits",
+    "attendance_records",
+    "attendance_events",
+    "attestations",
+    "work_activity_shifts",
+}
+_NOT_CHUNKABLE = {
+    # rollup (one period-aggregate row per employee)
+    "timekeeping_timecard_metrics",
+    "accruals_balances",
+    "accruals_summaries",
+    "accruals_transactions",
+    # own minute cap / net-change / async / org snapshot
+    "timekeeping_punches",
+    "work_activity_net_changes",
+    "payroll_export",
+    "persons",
+    "business_structure",
+    "hyperfind_queries",
+    "work_activities",
+    "forecasting",
+}
+
+
+@pytest.mark.parametrize("name", sorted(_CHUNKABLE))
+def test_window_chunkable_true_for_per_event_resources(name):
+    assert get_resource(name).window_chunkable is True
+
+
+@pytest.mark.parametrize("name", sorted(_NOT_CHUNKABLE))
+def test_window_chunkable_false_for_rollup_and_special_resources(name):
+    assert get_resource(name).window_chunkable is False
+
+
+def test_chunkable_classification_covers_every_resource():
+    # Guard: every registered resource is classified, so a new resource can't silently default in.
+    assert _CHUNKABLE | _NOT_CHUNKABLE == set(RESOURCE_REGISTRY)

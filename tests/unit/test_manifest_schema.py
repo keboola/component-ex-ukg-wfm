@@ -134,6 +134,71 @@ def test_keyless_resource_all_columns_nullable(component, tmp_path):
         assert cols[name].get("primary_key", False) is False
 
 
+def test_full_load_backfills_sticky_columns_from_state(tmp_path, monkeypatch):
+    """A full_load run whose data omits an optional column must still emit it (unioned from state),
+    so a native-typed REPLACE isn't rejected with 'Missing columns'. Regression for the downstream
+    schema-mismatch failure the End-Date bug produced (near-empty result dropped 'actualTotals').
+    Sticky columns now apply to full loads, not just incremental."""
+    params = {**_PARAMS, "resource": "timekeeping_timecard_metrics", "load_type": "full_load"}
+    data_dir = _make_datadir(tmp_path, params)
+    # A prior good run recorded the full column set (incl. the optional actualTotals) in state.
+    (data_dir / "in" / "state.json").write_text(
+        json.dumps(
+            {
+                "schema_columns": {
+                    "timekeeping_timecard_metrics": [
+                        "actualTotals",
+                        "employeeId_id",
+                        "employeeId_name",
+                        "employeeId_qualifier",
+                    ]
+                }
+            }
+        )
+    )
+    monkeypatch.setenv("KBC_DATADIR", str(data_dir))
+    component = Component()
+    resource = get_resource("timekeeping_timecard_metrics")
+
+    # This run mirrors the near-empty response: the actualTotals column is absent from the data.
+    records = iter([{"employeeId_id": "E1", "employeeId_name": "x", "employeeId_qualifier": "q"}])
+    row_count, columns = component._stream_and_write_table(resource, records)
+
+    assert row_count == 1
+    assert "actualTotals" in columns  # back-filled from sticky state despite being absent in the data
+    cols = _schema_by_col(tmp_path / "data", "timekeeping_timecard_metrics")
+    assert {"actualTotals", "employeeId_id", "employeeId_name", "employeeId_qualifier"} <= set(cols)
+
+
+def test_zero_row_full_load_warns_about_replacing_destination(tmp_path, monkeypatch, caplog):
+    """A zero-row full load replaces the destination table with an empty header-only one — a
+    transient empty API response would silently truncate previously loaded data. It must warn."""
+    params = {**_PARAMS, "resource": "persons", "load_type": "full_load"}
+    component = _build_component(tmp_path, monkeypatch, params)
+    resource = get_resource("persons")
+
+    with caplog.at_level("WARNING"):
+        row_count, columns = component._write_empty_table(resource)
+
+    assert row_count == 0
+    assert columns  # known columns (the primary key) -> the header-only path, not the no-schema path
+    assert any("persons" in record.message and "full load" in record.message.lower() for record in caplog.records)
+
+
+def test_zero_row_incremental_load_does_not_warn(tmp_path, monkeypatch, caplog):
+    """A zero-row incremental run is a no-op append, not a truncation — it must not warn."""
+    params = {**_PARAMS, "resource": "persons", "load_type": "incremental_load"}
+    component = _build_component(tmp_path, monkeypatch, params)
+    resource = get_resource("persons")
+
+    with caplog.at_level("WARNING"):
+        row_count, columns = component._write_empty_table(resource)
+
+    assert row_count == 0
+    assert columns
+    assert not any(record.levelname == "WARNING" for record in caplog.records)
+
+
 def test_composite_pk_all_key_columns_non_nullable(component, tmp_path):
     """Every column in a composite primary key must be non-nullable."""
     resource = ResourceDef(

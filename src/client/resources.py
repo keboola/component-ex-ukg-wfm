@@ -108,6 +108,30 @@ class ResourceDef(BaseModel):
     records_key: str | None = None
     primary_key: list[str] = Field(default_factory=list)
 
+    @property
+    def window_chunkable(self) -> bool:
+        """True when splitting the fetch window into date sub-windows yields correct rows.
+
+        Only per-event, employee-scoped, calendar-date resources qualify — the ones whose rows are
+        individual timestamped events (shifts, timecards, leave/attendance records, attestations), so
+        partitioning by date just partitions the rows. Excluded, fail-closed:
+        - EMPLOYEE_SET_METRICS (timecard_metrics + accruals) return ONE period-rollup row per
+          employee — VERIFIED live: a [2026-04-21, 2026-07-27] read returns one row per employee with
+          the daily detail nested — so splitting would emit a partial-period row per sub-window
+          (collapsing under the employeeId_id upsert, or inflating a full load).
+        - Punch-style resources have their own per-call minute cap (window_max_minutes > 0).
+        - Net-change resources aren't a plain date window (IncrementalStyle.NET_CHANGE).
+        - Org-level resources (employee_scope != HYPERFIND, e.g. forecasting) whose row/aggregation
+          semantics aren't verified — excluded until proven splittable.
+        For the excluded ones the memory lever is `batch_size` (employee chunking), not `window_days`.
+        """
+        return (
+            self.incremental_style == IncrementalStyle.DATE_WINDOW
+            and self.body_style != BodyStyle.EMPLOYEE_SET_METRICS
+            and self.window_max_minutes == 0
+            and self.employee_scope == EmployeeScope.HYPERFIND
+        )
+
 
 RESOURCE_REGISTRY: dict[str, ResourceDef] = {
     # VERIFIED live: POST /commons/persons/apply_read is a bulk (org-wide) read that pages via

@@ -109,6 +109,20 @@
       },
       "propertyOrder": 40
     },
+    "window_days": {
+      "type": "integer",
+      "title": "Window Chunk Size (days)",
+      "description": "Split the Start/End window into chunks of at most this many days, fetched one at a time.",
+      "minimum": 1,
+      "maximum": 365,
+      "options": {
+        "tooltip": "Optional. For a large date range on a per-event resource (schedules, shifts, timecards, leave, attendance, attestations), lower this to pull the data in smaller pieces so the job stays under the memory limit — each chunk is fetched and written separately. Leave empty for the default (365 days). NOT for rollup resources (Timecard Metrics, Accruals), which return one total per employee — control their memory with a smaller employee batch instead. Punch-level resources always use their own per-request cap.",
+        "dependencies": {
+          "window_type": "date_window"
+        }
+      },
+      "propertyOrder": 41
+    },
     "payroll_query": {
       "type": "string",
       "format": "textarea",

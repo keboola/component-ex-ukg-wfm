@@ -65,19 +65,33 @@ Incremental & windowing
 - The **fetch window is driven purely by Start Date / End Date** and is recomputed from the
   configuration on every run — there is no persisted state watermark. **Load Type controls only how
   Storage is written** (full replace vs incremental upsert), never how much data is fetched.
-- **Start Date (`since`)** is the lower bound of the API fetch, applied on every run. Leave it empty
-  for an unbounded lower bound.
+- **Start Date (`since`)** is the lower bound of the API fetch, applied on every run. It is
+  **required** for a date-windowed resource: the WFM read endpoints need a bounded range, so a run
+  with no Start Date (and no Symbolic Period) fails fast with a clear error rather than silently
+  falling back to WFM's default period. Org-snapshot resources (e.g. persons, business structure)
+  have no window and ignore it.
 - **End Date (`until`)** optionally bounds the upper end (empty = the current run time). Because there
-  is no watermark, an absolute End Date simply fetches the same `[since, until]` window each run; an
-  empty window (Start Date not before End Date) is logged as a warning.
-- The window is split into **≤365-day sub-windows** to respect service limits; employee sets are
-  chunked by each resource's per-call batch limit (≤500 for most, 100 for persons, 50 for activity
-  net-changes) and adaptively **halved on HTTP 413**.
+  is no watermark, an absolute End Date simply fetches the same `[since, until]` window each run. An
+  inverted window (Start Date on or after End Date) fails fast with a clear error.
+- For **per-event resources** (schedules, shifts, timecards, leave, attendance, attestations) the
+  window is split into sub-windows to respect service limits and cap memory — **≤365 days by
+  default**, or **`window_days`** when set (lower it to pull a large range in smaller pieces). Because
+  WFM's `endDate` is inclusive, sub-windows are split so no calendar day is fetched twice.
+- **Rollup resources** (timecard metrics, accruals) and **net-change** resources are **never**
+  date-split — they read the whole `[since, until]` range in a single request (a rollup returns one
+  total per employee, so splitting would corrupt it), regardless of range length. They reject
+  `window_days`; control their memory with a smaller employee **`batch_size`** instead.
+- Employee sets are chunked by each resource's per-call batch limit (≤500 for most, 100 for
+  timecard-metrics/persons, 50 for activity net-changes), overridable per config with `batch_size`,
+  and adaptively **halved on HTTP 413**.
 - Net-change resources currently run as a date-windowed full **replace** (like other keyless
   resources); true net-change delta is deferred until a resource gains a stable primary key.
-- A run that returns **no rows** writes a header-only table when the resource has a primary key (so a
-  full load still replaces its destination and downstream configs can bind to it); a keyless resource
-  logs that its previous contents were kept.
+- A run that returns **no rows** re-emits the resource's known column set — its primary key plus every
+  column seen on prior runs (persisted in state) — as a header-only table, so a full load still
+  replaces its destination (to empty) and downstream configs keep a stable schema. This applies to
+  full loads too, so a keyless full-replace resource that has emitted columns before now writes an
+  empty table rather than retaining stale contents. Only a keyless resource that has never emitted any
+  column has nothing to write, and there the destination's previous contents are kept.
 - **Incremental upsert requires a primary key.** A resource upserts incrementally only when a primary
   key exists — either its registry default or one supplied via the row's `primary_key` field. A
   registry-keyless resource with no user-supplied `primary_key` always runs full-replace

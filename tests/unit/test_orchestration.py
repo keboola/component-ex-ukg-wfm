@@ -441,3 +441,102 @@ def test_non_metrics_read_omits_partial_success():
         m.post(f"{HOST}/api/v1{res.endpoint_path}", json=_cap)
         list(paginate_multi_read(c, res, {"where": {}}))
     assert "partial_success" not in captured["qs"]
+
+
+def test_window_days_splits_pull_into_sub_windows():
+    # A large [Start, End] window with window_days set is fetched as several contiguous sub-window
+    # requests (memory-safe date chunking) rather than one giant request — the lever for the OOM the
+    # customer hit pulling a wide range in a single call.
+    res = get_resource("timekeeping_timecards")  # DATE_WINDOW, one request per (chunk, window)
+    ranges: list[dict] = []
+    with requests_mock.Mocker() as m:
+        c = _client(m)
+        m.post(
+            f"{HOST}/api/v1/commons/hyperfind/execute",
+            json={"count": 1, "result": {"refs": [{"id": 7}], "basePersons": []}},
+        )
+
+        def _capture(request, context):
+            ranges.append(request.json()["where"].get("dateRange"))
+            return {"records": [{"id": 1}]}
+
+        m.post(f"{HOST}/api/v1{res.endpoint_path}", json=_capture)
+        rows = list(
+            iter_records(
+                c,
+                res,
+                hyperfind_ref="253",
+                since_iso="2026-01-01T00:00:00+00:00",
+                until_iso="2026-04-01T00:00:00+00:00",  # 90 days
+                select=[],
+                window_days=30,
+            )
+        )
+    # 90 days / 30-day chunks -> 3 sub-windows, each its own request.
+    assert len(ranges) == 3
+    assert rows == [{"id": 1}, {"id": 1}, {"id": 1}]
+    assert ranges[0]["startDate"] == "2026-01-01"
+    assert ranges[-1]["endDate"] == "2026-04-01"
+    # Inclusive endDate: adjacent windows must NOT share a boundary day (else duplicate rows).
+    ends = {r["endDate"] for r in ranges}
+    starts = {r["startDate"] for r in ranges}
+    assert ends.isdisjoint(starts)
+
+
+def test_rollup_resource_never_date_split_even_over_multiple_years():
+    # A rollup resource (EMPLOYEE_SET_METRICS) is not window-chunkable, so its window is NEVER date
+    # split — not by window_days, and (critically) not by the 365-day default either. A 2-year
+    # backfill must issue ONE request, or each employee's period rollup would be split into
+    # partial-period rows (collapsing under the employeeId_id upsert / inflating a full load).
+    res = get_resource("timekeeping_timecard_metrics")
+    assert res.window_chunkable is False
+    ranges: list[dict] = []
+    with requests_mock.Mocker() as m:
+        c = _client(m)
+        m.post(
+            f"{HOST}/api/v1/commons/hyperfind/execute",
+            json={"count": 1, "result": {"refs": [{"id": 7}], "basePersons": []}},
+        )
+
+        def _capture(request, context):
+            ranges.append(request.json()["where"]["employeeSet"].get("dateRange"))
+            return [{"employeeId_id": "E1"}]
+
+        m.post(f"{HOST}/api/v1{res.endpoint_path}", json=_capture)
+        list(
+            iter_records(
+                c,
+                res,
+                hyperfind_ref="253",
+                since_iso="2024-01-01T00:00:00+00:00",
+                until_iso="2026-01-01T00:00:00+00:00",  # ~731 days -> would be 3 windows if split
+                select=["ACTUAL_TOTALS"],
+                window_days=30,
+            )
+        )
+    # One request covering the whole range, not 3 (365-day) or 24 (window_days) partial-period reads.
+    assert len(ranges) == 1
+    assert ranges[0] == {"startDate": "2024-01-01", "endDate": "2026-01-01"}
+
+
+def test_no_window_days_keeps_single_request_under_a_year():
+    # Without window_days a sub-year window stays one request — the default behaviour is unchanged.
+    res = get_resource("timekeeping_timecards")
+    with requests_mock.Mocker() as m:
+        c = _client(m)
+        m.post(
+            f"{HOST}/api/v1/commons/hyperfind/execute",
+            json={"count": 1, "result": {"refs": [{"id": 7}], "basePersons": []}},
+        )
+        read = m.post(f"{HOST}/api/v1{res.endpoint_path}", json={"records": [{"id": 1}]})
+        list(
+            iter_records(
+                c,
+                res,
+                hyperfind_ref="253",
+                since_iso="2026-01-01T00:00:00+00:00",
+                until_iso="2026-04-01T00:00:00+00:00",
+                select=[],
+            )
+        )
+    assert read.call_count == 1
