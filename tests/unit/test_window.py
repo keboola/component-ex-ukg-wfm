@@ -57,6 +57,25 @@ def test_day_windows_do_not_share_a_boundary_day():
     assert windows[-1][1] == end
 
 
+def test_calendar_same_day_window_returns_single_window():
+    # Regression: Start == End is a valid one-day pull (WFM's calendar dateRange.endDate is
+    # inclusive) and must return that single day, not be dropped by the end<=start short-circuit.
+    day = datetime(2026, 8, 13, tzinfo=UTC)
+    assert split_date_windows(day, day, max_days=365) == [(day, day)]
+
+
+def test_calendar_end_before_start_returns_empty():
+    start = datetime(2026, 8, 13, tzinfo=UTC)
+    end = datetime(2026, 8, 12, tzinfo=UTC)
+    assert split_date_windows(start, end, max_days=365) == []
+
+
+def test_minute_window_same_start_and_end_returns_empty():
+    # The minute branch keeps the original "nothing to fetch" behaviour for a zero-length window.
+    moment = datetime(2026, 1, 1, tzinfo=UTC)
+    assert split_date_windows(moment, moment, max_minutes=60) == []
+
+
 def test_minute_windows_stay_contiguous():
     # Punch minute-cap windows keep the original contiguous half-open datetime behaviour.
     start = datetime(2026, 1, 1, 0, 0, tzinfo=UTC)

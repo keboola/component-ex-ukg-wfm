@@ -68,10 +68,15 @@ def split_date_windows(
     twice — duplicating rows for keyless resources. Each non-final day-window therefore ends one day
     before the next begins, so every calendar day is fetched exactly once (the final window keeps the
     real end). Callers truncate these bounds to a calendar date (see orchestration._as_date).
+
+    A same-day calendar window (end == start) is a valid single-day pull (the inclusive endDate means
+    Start == End covers exactly that one day) and returns the single window [(start, end)] rather than
+    entering the day-splitting loop below (which requires `cursor < end` to make progress). The minute
+    branch has no such case: a zero-length minute window has nothing to fetch, so it still returns [].
     """
-    if end <= start:
-        return []
     if max_minutes > 0:
+        if end <= start:
+            return []
         span = timedelta(minutes=max_minutes)
         windows: list[tuple[datetime, datetime]] = []
         cursor = start
@@ -81,6 +86,10 @@ def split_date_windows(
             cursor = nxt
         return windows
     # Calendar-day chunking with an inclusive endDate: end each non-final window a day early.
+    if end < start:
+        return []
+    if end == start:
+        return [(start, end)]
     span = timedelta(days=max_days)
     windows = []
     cursor = start

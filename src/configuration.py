@@ -34,7 +34,7 @@ class Configuration(BaseModel):
     # sub-window is a separate request whose response is parsed on its own. Empty = the per-resource
     # default (365 days). Ignored by punch-level resources, which always use their own minute cap,
     # and by non-date-windowed resources.
-    window_days: int | None = Field(default=None, ge=1)
+    window_days: int | None = Field(default=None, ge=1, le=365)
     # UI discriminator for how the fetch window is chosen: "date_window" (Start/End Date) or
     # "symbolic_period" (a rolling UKG period). It gates which fields the form shows AND is
     # authoritative in code (see effective_symbolic_period) so a hidden, stale symbolic_period value

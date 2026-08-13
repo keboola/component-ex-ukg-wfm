@@ -68,14 +68,29 @@ def test_both_bounds_set_is_valid():
     assert until_iso == "2026-06-01T00:00:00+00:00"
 
 
-def test_end_on_or_before_start_raises():
+def test_start_day_strictly_after_end_day_raises():
+    # An inverted window (Start's calendar day strictly after End's) yields an empty pull that reads
+    # as "the End Date parameter is broken" — reject it up front.
     comp = _comp(
         resource="timekeeping_timecard_metrics",
         since="2026-06-01T00:00:00+00:00",
         until="2026-01-01T00:00:00+00:00",
     )
-    with pytest.raises(UserException, match="must be earlier than End Date"):
+    with pytest.raises(UserException, match="must be on or before End Date"):
         comp._compute_window(get_resource("timekeeping_timecard_metrics"))
+
+
+def test_same_calendar_day_window_is_valid():
+    # Regression: WFM's dateRange.endDate is INCLUSIVE and the API bounds are truncated to a
+    # calendar date, so Start == End is a valid one-day pull. Must NOT raise.
+    comp = _comp(
+        resource="timekeeping_timecard_metrics",
+        since="2026-08-13T00:00:00+00:00",
+        until="2026-08-13T00:00:00+00:00",
+    )
+    since_iso, until_iso = comp._compute_window(get_resource("timekeeping_timecard_metrics"))
+    assert since_iso == "2026-08-13T00:00:00+00:00"
+    assert until_iso == "2026-08-13T00:00:00+00:00"
 
 
 def test_symbolic_period_needs_no_start_date():
