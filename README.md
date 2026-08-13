@@ -62,6 +62,11 @@ Supported resources
 > `timekeeping_timecard_metrics_actual_totals`), so different metric groups land in separate,
 > schema-stable tables instead of sharing one table's schema and sticky-column state.
 >
+> **Incremental upsert never deletes.** A corrected or removed timecard line still lingers in the
+> output table after an upsert run, and a changed `payCode` produces a new `uniqueId` (a new row)
+> while the old row remains rather than being replaced. Run a full load when you need the table to
+> fully reconcile with the source.
+>
 > The **Work / Activities** resources require the Activities Integration API license, which is off on the
 > reference tenant (HTTP 403 `WFA-000030`); their request shapes are verified but a live 200 is gated on
 > licensing. **Forecasting** needs a non-empty tenant-configured `categoryDrivers` set; the reference

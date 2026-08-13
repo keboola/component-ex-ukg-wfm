@@ -276,6 +276,173 @@ def test_zero_row_incremental_load_does_not_warn(tmp_path, monkeypatch, caplog):
     assert not any(record.levelname == "WARNING" for record in caplog.records)
 
 
+def test_user_primary_key_overridden_by_unique_id_warns(tmp_path, monkeypatch, caplog):
+    """An exploded resource whose rows carry `uniqueId` always keys on it, even when the user
+    configured a different primary_key. That override is correct but silent otherwise — it must
+    warn so the user understands why their configured PK was not used."""
+    params = {
+        **_PARAMS,
+        "resource": "timekeeping_timecard_metrics",
+        "load_type": "incremental_load",
+        "metric_group": "ACTUAL_TOTALS",
+        "primary_key": ["employeeId_id"],
+    }
+    component = _build_component(tmp_path, monkeypatch, params)
+    resource = get_resource("timekeeping_timecard_metrics")
+
+    records = iter(
+        [
+            {
+                "employeeId": {"id": 14212},
+                "actualTotals": [
+                    {"uniqueId": "14212:2026-07-27:409", "applyDate": "2026-07-27", "hoursAmount": 8.0},
+                ],
+            }
+        ]
+    )
+    with caplog.at_level("WARNING"):
+        row_count, _ = component._stream_and_write_table(resource, records)
+
+    assert row_count == 1
+    cols = _schema_by_col(tmp_path / "data", "timekeeping_timecard_metrics_actual_totals")
+    assert cols["uniqueId"]["primary_key"] is True
+    assert cols["employeeId_id"].get("primary_key", False) is False
+    assert any(
+        "employeeId_id" in record.message and "uniqueId" in record.message and record.levelname == "WARNING"
+        for record in caplog.records
+    )
+
+
+def test_no_user_primary_key_on_exploded_resource_does_not_warn_about_override(tmp_path, monkeypatch, caplog):
+    """No override warning when the user never set a primary_key in the first place — uniqueId is
+    simply the resource's natural key, nothing was overridden."""
+    params = {
+        **_PARAMS,
+        "resource": "timekeeping_timecard_metrics",
+        "load_type": "incremental_load",
+        "metric_group": "ACTUAL_TOTALS",
+    }
+    component = _build_component(tmp_path, monkeypatch, params)
+    resource = get_resource("timekeeping_timecard_metrics")
+
+    records = iter(
+        [
+            {
+                "employeeId": {"id": 14212},
+                "actualTotals": [
+                    {"uniqueId": "14212:2026-07-27:409", "applyDate": "2026-07-27", "hoursAmount": 8.0},
+                ],
+            }
+        ]
+    )
+    with caplog.at_level("WARNING"):
+        component._stream_and_write_table(resource, records)
+
+    assert not any("overridden" in record.message for record in caplog.records)
+
+
+def test_exploded_resource_without_unique_id_and_no_user_pk_warns_keyless_full_replace(tmp_path, monkeypatch, caplog):
+    """A metric group section without `uniqueId` (and no user-supplied primary_key) has no
+    incremental key at all: it silently falls back to a keyless full replace. That must be
+    surfaced, since an incremental config would otherwise appear to do nothing."""
+    params = {
+        **_PARAMS,
+        "resource": "timekeeping_timecard_metrics",
+        "load_type": "incremental_load",
+        "metric_group": "SCHEDULED_TOTALS",
+    }
+    component = _build_component(tmp_path, monkeypatch, params)
+    resource = get_resource("timekeeping_timecard_metrics")
+
+    # This section's line items carry no uniqueId — an exploded row with no natural key.
+    records = iter(
+        [
+            {
+                "employeeId": {"id": 14212},
+                "scheduledTotals": [
+                    {"applyDate": "2026-07-27", "hoursAmount": 8.0},
+                ],
+            }
+        ]
+    )
+    with caplog.at_level("WARNING"):
+        row_count, columns = component._stream_and_write_table(resource, records)
+
+    assert row_count == 1
+    assert "uniqueId" not in columns
+    manifest = _manifest(tmp_path / "data", "timekeeping_timecard_metrics_scheduled_totals")
+    assert manifest.get("incremental", False) is False
+    cols = _schema_by_col(tmp_path / "data", "timekeeping_timecard_metrics_scheduled_totals")
+    assert all(col.get("primary_key", False) is False for col in cols.values())
+    assert any(
+        "timekeeping_timecard_metrics" in record.message
+        and "no incremental key" in record.message
+        and "full replace" in record.message
+        and record.levelname == "WARNING"
+        for record in caplog.records
+    )
+
+
+def test_exploded_resource_with_unique_id_does_not_warn_keyless_full_replace(tmp_path, monkeypatch, caplog):
+    """When the exploded rows DO carry uniqueId, there is a real incremental key, so the
+    keyless-full-replace warning must not fire."""
+    params = {
+        **_PARAMS,
+        "resource": "timekeeping_timecard_metrics",
+        "load_type": "incremental_load",
+        "metric_group": "ACTUAL_TOTALS",
+    }
+    component = _build_component(tmp_path, monkeypatch, params)
+    resource = get_resource("timekeeping_timecard_metrics")
+
+    records = iter(
+        [
+            {
+                "employeeId": {"id": 14212},
+                "actualTotals": [
+                    {"uniqueId": "14212:2026-07-27:409", "applyDate": "2026-07-27", "hoursAmount": 8.0},
+                ],
+            }
+        ]
+    )
+    with caplog.at_level("WARNING"):
+        component._stream_and_write_table(resource, records)
+
+    assert not any("full replace" in record.message for record in caplog.records)
+
+
+def test_exploded_resource_without_unique_id_but_with_user_pk_does_not_warn_keyless(tmp_path, monkeypatch, caplog):
+    """A user-supplied primary_key gives a section without uniqueId a real incremental key, so the
+    keyless-full-replace warning must not fire (there IS a usable key, just not uniqueId)."""
+    params = {
+        **_PARAMS,
+        "resource": "timekeeping_timecard_metrics",
+        "load_type": "incremental_load",
+        "metric_group": "SCHEDULED_TOTALS",
+        "primary_key": ["employeeId_id"],
+    }
+    component = _build_component(tmp_path, monkeypatch, params)
+    resource = get_resource("timekeeping_timecard_metrics")
+
+    records = iter(
+        [
+            {
+                "employeeId": {"id": 14212},
+                "scheduledTotals": [
+                    {"applyDate": "2026-07-27", "hoursAmount": 8.0},
+                ],
+            }
+        ]
+    )
+    with caplog.at_level("WARNING"):
+        row_count, _ = component._stream_and_write_table(resource, records)
+
+    assert row_count == 1
+    cols = _schema_by_col(tmp_path / "data", "timekeeping_timecard_metrics_scheduled_totals")
+    assert cols["employeeId_id"]["primary_key"] is True
+    assert not any("full replace" in record.message for record in caplog.records)
+
+
 def test_composite_pk_all_key_columns_non_nullable(component, tmp_path):
     """Every column in a composite primary key must be non-nullable."""
     resource = ResourceDef(

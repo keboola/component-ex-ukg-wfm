@@ -188,6 +188,7 @@ class Component(ComponentBase):
         if self._config.resource is None:
             raise UserException("'resource' is required. Configure a resource row.")
         resource = get_resource(self._config.resource)
+        self._warn_legacy_metric_groups_fold(resource)
         # window_days chunks a date range into per-sub-window requests. That only makes sense for
         # per-event resources; for a period-rollup resource (timecard_metrics, accruals) it would
         # split the single per-employee aggregate row into partial-period rows, so refuse it here
@@ -231,6 +232,26 @@ class Component(ComponentBase):
         if resource.explode and self._config.effective_select:
             return f"{resource.name}_{self._config.effective_select[0].lower()}"
         return resource.name
+
+    def _warn_legacy_metric_groups_fold(self, resource: ResourceDef) -> None:
+        """Warn once per run when a config relies on the legacy `metric_groups` back-compat fold.
+
+        `Configuration.effective_select` silently folds a multi-value `metric_groups` list to its
+        first element when the single-select `metric_group` is unset (see configuration.py). That
+        is intentional back-compat behaviour, but a config with several groups configured would
+        otherwise drop the rest with no signal in the job log — surface it here instead.
+        """
+        if (
+            resource.name == "timekeeping_timecard_metrics"
+            and not self._config.metric_group
+            and self._config.metric_groups
+        ):
+            logging.warning(
+                "Config uses the legacy 'metric_groups' %s; only the first (%s) is applied and the rest are "
+                "ignored. Switch to the single 'metric_group' field.",
+                self._config.metric_groups,
+                self._config.metric_groups[0],
+            )
 
     def _load_sticky_columns(self, name: str) -> list[str]:
         """Every column emitted for this output table on prior runs, persisted in state.json.
@@ -407,6 +428,20 @@ class Component(ComponentBase):
             # uniqueId when present (resolve_primary_key), else the user/registry key. Incremental
             # upsert engages only with a non-empty PK.
             primary_key = resolve_primary_key(resource, list(seen_columns), self._config.primary_key)
+            if self._config.primary_key and primary_key != self._config.primary_key:
+                logging.warning(
+                    "Resource '%s' is keyed on 'uniqueId'; the configured primary_key %s is overridden for "
+                    "this exploded resource.",
+                    resource.name,
+                    self._config.primary_key,
+                )
+            if resource.explode and "uniqueId" not in seen_columns and not self._config.primary_key:
+                logging.warning(
+                    "Exploded resource '%s' produced no 'uniqueId' column; it has no incremental key and "
+                    "will load as a full replace. Set a Primary Key if you need incremental upsert for this "
+                    "metric group.",
+                    resource.name,
+                )
             is_incremental = self._config.incremental and bool(primary_key)
             # Sticky schema: union this run's columns with every column seen before (state.json) so
             # the set never shrinks below the existing table, then persist the grown set. Columns

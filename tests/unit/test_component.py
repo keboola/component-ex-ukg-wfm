@@ -112,3 +112,65 @@ def test_output_name_exploded_resource_with_empty_selection_stays_plain():
     comp = _output_name_comp(resource="timekeeping_timecard_metrics")
     resource = get_resource("timekeeping_timecard_metrics")
     assert comp._output_name(resource) == "timekeeping_timecard_metrics"
+
+
+# --- Component._warn_legacy_metric_groups_fold -------------------------------------------------
+#
+# `run()` calls this once per run, right after resolving the resource, so it is not exercised via
+# a @property/@computed_field that could fire repeatedly. `Configuration.effective_select` folds a
+# legacy multi-value `metric_groups` list to its first element when `metric_group` is unset; that
+# fold is intentional back-compat, but previously silent -- it must warn so the job log explains
+# which group was applied and which were dropped.
+
+
+def test_legacy_metric_groups_fold_warns_which_group_wins(caplog):
+    comp = _output_name_comp(
+        resource="timekeeping_timecard_metrics",
+        metric_groups=["ACTUAL_TOTALS", "SCHEDULED_TOTALS"],
+    )
+    resource = get_resource("timekeeping_timecard_metrics")
+
+    with caplog.at_level("WARNING"):
+        comp._warn_legacy_metric_groups_fold(resource)
+
+    assert any(
+        record.levelname == "WARNING" and "ACTUAL_TOTALS" in record.message and "SCHEDULED_TOTALS" in record.message
+        for record in caplog.records
+    )
+
+
+def test_metric_group_set_does_not_trigger_legacy_fold_warning(caplog):
+    # metric_group set -> effective_select uses it directly, metric_groups is irrelevant/unused.
+    comp = _output_name_comp(
+        resource="timekeeping_timecard_metrics",
+        metric_group="ACTUAL_TOTALS",
+        metric_groups=["SCHEDULED_TOTALS"],
+    )
+    resource = get_resource("timekeeping_timecard_metrics")
+
+    with caplog.at_level("WARNING"):
+        comp._warn_legacy_metric_groups_fold(resource)
+
+    assert not caplog.records
+
+
+def test_no_metric_groups_does_not_trigger_legacy_fold_warning(caplog):
+    comp = _output_name_comp(resource="timekeeping_timecard_metrics", metric_group="ACTUAL_TOTALS")
+    resource = get_resource("timekeeping_timecard_metrics")
+
+    with caplog.at_level("WARNING"):
+        comp._warn_legacy_metric_groups_fold(resource)
+
+    assert not caplog.records
+
+
+def test_legacy_fold_warning_scoped_to_timecard_metrics_resource(caplog):
+    # Even if metric_groups were set on a config for a different resource, the resource-name guard
+    # keeps this warning scoped to timekeeping_timecard_metrics.
+    comp = _output_name_comp(resource="persons", metric_groups=["ACTUAL_TOTALS"])
+    resource = get_resource("persons")
+
+    with caplog.at_level("WARNING"):
+        comp._warn_legacy_metric_groups_fold(resource)
+
+    assert not caplog.records
