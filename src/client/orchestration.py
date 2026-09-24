@@ -145,7 +145,7 @@ def _employee_id_in_record(record: dict[str, Any]) -> int | None:
         return None
     try:
         return int(ref)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
 
 
