@@ -443,6 +443,225 @@ def test_exploded_resource_without_unique_id_but_with_user_pk_does_not_warn_keyl
     assert not any("full replace" in record.message for record in caplog.records)
 
 
+def test_known_columns_floor_backfills_missing_column_for_fresh_config_row(tmp_path, monkeypatch):
+    """CFTL-814 regression: the known-columns floor (ResourceDef.known_columns /
+    Component._known_columns_floor) must emit `payPeriodWeek` even when this run's data omits it
+    entirely -- without the fix, a fresh config row (no sticky state) whose ACTUAL_TOTALS records
+    happen to lack the optional `payPeriodWeek` field would narrow the shared output table's schema
+    below the destination's and fail the load with "Some columns are missing in the csv file"."""
+    params = {
+        **_PARAMS,
+        "resource": "timekeeping_timecard_metrics",
+        "load_type": "full_load",
+        "metric_group": "ACTUAL_TOTALS",
+    }
+    component = _build_component(tmp_path, monkeypatch, params)
+    resource = get_resource("timekeeping_timecard_metrics")
+
+    # Line items deliberately omit "payPeriodWeek" -- an optional field not every entry carries.
+    records = iter(
+        [
+            {
+                "employeeId": {"id": 14212},
+                "actualTotals": [
+                    {"uniqueId": "14212:2026-07-27:409", "applyDate": "2026-07-27", "hoursAmount": 8.0},
+                ],
+            }
+        ]
+    )
+    row_count, columns = component._stream_and_write_table(resource, records)
+    assert row_count == 1
+    # The final column set is the floor unioned in -- payPeriodWeek is present despite the data
+    # itself never producing it.
+    assert "payPeriodWeek" in columns
+
+    table = "timekeeping_timecard_metrics_actual_totals"
+    cols = _schema_by_col(tmp_path / "data", table)
+    assert "payPeriodWeek" in cols
+    assert cols["payPeriodWeek"]["nullable"] is True
+
+    rows = _csv_rows(tmp_path / "data", table)
+    header = rows[0].split(",")
+    assert "payPeriodWeek" in header
+    # The data row has no value for it -- emitted empty at that column's position.
+    idx = header.index("payPeriodWeek")
+    assert rows[1].split(",")[idx] == ""
+
+
+def test_zero_row_fresh_config_row_writes_nothing_and_preserves_destination(tmp_path, monkeypatch):
+    """CFTL-814 safety: a row with EMPTY sticky state that returns ZERO rows must write NOTHING.
+
+    The output table is shared across config rows, so a row with no state has never populated it.
+    Emitting a header-only table would full-REPLACE a table another row populated with nothing (and
+    with no sticky columns the PK resolves empty, forcing incremental=False even for an incremental
+    row) — silent data loss. The known-columns floor must NOT resurrect a table write here; it only
+    applies on the rows-present path, and on a zero-row run for a row that already has state.
+    """
+    params = {
+        **_PARAMS,
+        "resource": "timekeeping_timecard_metrics",
+        "metric_group": "ACTUAL_TOTALS",
+        "load_type": "full_load",
+    }
+    component = _build_component(tmp_path, monkeypatch, params)
+    resource = get_resource("timekeeping_timecard_metrics")
+
+    row_count, columns = component._write_empty_table(resource)
+
+    assert row_count == 0
+    assert columns == [], f"a fresh zero-row row must not write (would truncate a shared table): {columns}"
+    tables = tmp_path / "data" / "out" / "tables"
+    assert not (tables.exists() and list(tables.glob("*.csv")))
+
+
+def test_metric_group_without_known_columns_floor_invents_nothing(tmp_path, monkeypatch):
+    """A metric group with no `known_columns` registry entry (SCHEDULED_TOTALS) must behave exactly
+    as before the fix: no column that is absent from both the actual data AND the floor may appear."""
+    params = {
+        **_PARAMS,
+        "resource": "timekeeping_timecard_metrics",
+        "load_type": "full_load",
+        "metric_group": "SCHEDULED_TOTALS",
+    }
+    component = _build_component(tmp_path, monkeypatch, params)
+    resource = get_resource("timekeeping_timecard_metrics")
+    assert resource.known_columns_floor("scheduled_totals") == []  # no floor for this metric group
+
+    records = iter(
+        [
+            {
+                "employeeId": {"id": 14212},
+                "scheduledTotals": [
+                    {"applyDate": "2026-07-27", "hoursAmount": 8.0},
+                ],
+            }
+        ]
+    )
+    row_count, columns = component._stream_and_write_table(resource, records)
+    assert row_count == 1
+    # No floor -> only the columns actually produced by the data; a floor-only column like
+    # "payPeriodWeek" (which belongs to a *different* metric group's floor) must NOT be invented.
+    assert "payPeriodWeek" not in columns
+    cols = _schema_by_col(tmp_path / "data", "timekeeping_timecard_metrics_scheduled_totals")
+    assert "payPeriodWeek" not in cols
+    assert set(columns) == {"employeeId_id", "applyDate", "hoursAmount"}
+
+
+def test_known_columns_floor_emits_the_full_registry_floor(tmp_path, monkeypatch):
+    """CFTL-814: the ENTIRE known-columns floor for actual_totals (35 columns, VERIFIED against a
+    production run's stored Storage schema) is emitted even when this run's data carries only a
+    handful of columns -- not just the one column (payPeriodWeek) production observed missing."""
+    params = {
+        **_PARAMS,
+        "resource": "timekeeping_timecard_metrics",
+        "load_type": "full_load",
+        "metric_group": "ACTUAL_TOTALS",
+    }
+    component = _build_component(tmp_path, monkeypatch, params)
+    resource = get_resource("timekeeping_timecard_metrics")
+    floor = resource.known_columns_floor("actual_totals")
+    assert len(floor) == 35  # guards the registry entry itself against an accidental shrink
+
+    # This run's data carries only a handful of columns -- far fewer than the floor.
+    records = iter(
+        [
+            {
+                "employeeId": {"id": 14212},
+                "actualTotals": [
+                    {"uniqueId": "14212:2026-07-27:409", "hoursAmount": 8.0},
+                ],
+            }
+        ]
+    )
+    row_count, columns = component._stream_and_write_table(resource, records)
+    assert row_count == 1
+    assert set(floor) <= set(columns)
+
+    table = "timekeeping_timecard_metrics_actual_totals"
+    cols = _schema_by_col(tmp_path / "data", table)
+    assert set(floor) <= set(cols)
+
+
+def test_known_columns_floor_persists_into_sticky_state(tmp_path, monkeypatch):
+    """CFTL-814: the floor must be persisted into state.json (not just emitted this run), so a
+    SECOND config row sharing the same output table converges on the full schema from its own
+    sticky state alone, even after the floor were ever removed from the registry."""
+    params = {
+        **_PARAMS,
+        "resource": "timekeeping_timecard_metrics",
+        "load_type": "full_load",
+        "metric_group": "ACTUAL_TOTALS",
+    }
+    component = _build_component(tmp_path, monkeypatch, params)
+    resource = get_resource("timekeeping_timecard_metrics")
+
+    records = iter(
+        [
+            {
+                "employeeId": {"id": 14212},
+                "actualTotals": [
+                    {"uniqueId": "14212:2026-07-27:409", "hoursAmount": 8.0},
+                ],
+            }
+        ]
+    )
+    component._stream_and_write_table(resource, records)
+
+    out_state = json.loads((tmp_path / "data" / "out" / "state.json").read_text())
+    persisted = out_state["schema_columns"]["timekeeping_timecard_metrics_actual_totals"]
+    assert "payPeriodWeek" in persisted
+    assert set(resource.known_columns_floor("actual_totals")) <= set(persisted)
+
+    # Keboola copies this run's out/state.json into the next run's in/state.json -- simulate that
+    # so a SECOND config row sharing this output table converges on the full schema from its own
+    # sticky state alone (independent of the registry floor still being defined).
+    next_data_dir = _make_datadir(tmp_path / "next", params)
+    (next_data_dir / "in" / "state.json").write_text(json.dumps(out_state))
+    monkeypatch.setenv("KBC_DATADIR", str(next_data_dir))
+    next_component = Component()
+    sticky = next_component._load_sticky_columns("timekeeping_timecard_metrics_actual_totals")
+    assert set(resource.known_columns_floor("actual_totals")) <= set(sticky)
+
+
+def test_known_columns_schema_grows_with_prior_sticky_column_absent_from_floor(tmp_path, monkeypatch):
+    """The schema only ever GROWS: a column a prior run saw (persisted in state) but that is absent
+    from both this run's data AND the resource's known-columns floor must still be re-emitted."""
+    params = {
+        **_PARAMS,
+        "resource": "timekeeping_timecard_metrics",
+        "load_type": "full_load",
+        "metric_group": "ACTUAL_TOTALS",
+    }
+    data_dir = _make_datadir(tmp_path, params)
+    table = "timekeeping_timecard_metrics_actual_totals"
+    # A prior run saw a column that is neither part of this run's data nor part of the floor.
+    (data_dir / "in" / "state.json").write_text(json.dumps({"schema_columns": {table: ["legacyOnlyColumn"]}}))
+    monkeypatch.setenv("KBC_DATADIR", str(data_dir))
+    component = Component()
+    resource = get_resource("timekeeping_timecard_metrics")
+    floor = resource.known_columns_floor("actual_totals")
+    assert "legacyOnlyColumn" not in floor
+
+    records = iter(
+        [
+            {
+                "employeeId": {"id": 14212},
+                "actualTotals": [
+                    {"uniqueId": "14212:2026-07-27:409", "hoursAmount": 8.0},
+                ],
+            }
+        ]
+    )
+    row_count, columns = component._stream_and_write_table(resource, records)
+    assert row_count == 1
+    # Grown, not shrunk: floor + prior sticky column + this run's own data columns all coexist.
+    assert set(floor) <= set(columns)
+    assert "legacyOnlyColumn" in columns
+
+    cols = _schema_by_col(tmp_path / "data", table)
+    assert "legacyOnlyColumn" in cols
+
+
 def test_composite_pk_all_key_columns_non_nullable(component, tmp_path):
     """Every column in a composite primary key must be non-nullable."""
     resource = ResourceDef(

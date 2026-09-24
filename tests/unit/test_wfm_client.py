@@ -5,7 +5,7 @@ import requests
 import requests_mock
 from keboola.component.exceptions import UserException
 
-from client.wfm_client import PayloadTooLargeError, WfmClient
+from client.wfm_client import _ERROR_BODY_MAX_CHARS, PayloadTooLargeError, WfmClient, _error_detail
 
 HOST = "https://acme.prd.mykronos.com"
 AUTH_URL = f"{HOST}/api/authentication/access_token"
@@ -106,3 +106,125 @@ def test_short_ttl_does_not_apply_negative_safety_margin():
         t0 = datetime.now(UTC)
         c.get_token()
         assert c._token_expiry >= t0 - timedelta(seconds=1)
+
+
+# --- CFTL-814: error-body detail surfaced in the job log (_error_detail / _call) ---------------
+
+
+def test_error_detail_surfaces_error_code_and_message_in_user_exception():
+    # {"errorCode","message"} is UKG's documented error-body shape; both must land in the message,
+    # and the existing "UKG WFM API error on ..." prefix must stay intact.
+    with requests_mock.Mocker() as m:
+        m.post(AUTH_URL, json={"access_token": "T1", "refresh_token": "R1", "expires_in": 3600})
+        m.post(
+            f"{HOST}/api/v1/x",
+            status_code=400,
+            json={"errorCode": "WFP-90011", "message": "Unrecognized property"},
+        )
+        c = _client()
+        with pytest.raises(UserException) as exc_info:
+            c.post_json("/x", {})
+    message = str(exc_info.value)
+    assert message.startswith("UKG WFM API error on")
+    assert "WFP-90011" in message
+    assert "Unrecognized property" in message
+
+
+def test_error_detail_surfaces_first_entry_from_errors_envelope():
+    # A nested {"errors":[...]} envelope surfaces the FIRST entry's code/message only.
+    with requests_mock.Mocker() as m:
+        m.post(AUTH_URL, json={"access_token": "T1", "refresh_token": "R1", "expires_in": 3600})
+        m.post(
+            f"{HOST}/api/v1/x",
+            status_code=400,
+            json={"errors": [{"errorCode": "X", "message": "Y"}, {"errorCode": "Z", "message": "W"}]},
+        )
+        c = _client()
+        with pytest.raises(UserException) as exc_info:
+            c.post_json("/x", {})
+    message = str(exc_info.value)
+    assert "X" in message
+    assert "Y" in message
+    assert "Z" not in message
+
+
+def test_error_detail_surfaces_first_entry_from_bare_list_envelope():
+    # A bare list body [{"errorCode","message"}, ...] is also tolerated (first entry wins).
+    with requests_mock.Mocker() as m:
+        m.post(AUTH_URL, json={"access_token": "T1", "refresh_token": "R1", "expires_in": 3600})
+        m.post(f"{HOST}/api/v1/x", status_code=400, json=[{"errorCode": "X", "message": "Y"}])
+        c = _client()
+        with pytest.raises(UserException) as exc_info:
+            c.post_json("/x", {})
+    message = str(exc_info.value)
+    assert "X" in message
+    assert "Y" in message
+
+
+def test_error_detail_falls_back_to_raw_text_for_non_json_body():
+    # A non-JSON (e.g. HTML) error body still surfaces something useful, never crashes.
+    with requests_mock.Mocker() as m:
+        m.post(AUTH_URL, json={"access_token": "T1", "refresh_token": "R1", "expires_in": 3600})
+        m.post(f"{HOST}/api/v1/x", status_code=400, text="<html><body>Bad Request</body></html>")
+        c = _client()
+        with pytest.raises(UserException) as exc_info:
+            c.post_json("/x", {})
+    assert "Bad Request" in str(exc_info.value)
+
+
+def test_error_detail_empty_body_has_no_dangling_separator():
+    # An empty error body must leave the original prefix untouched -- no trailing " — " appended.
+    with requests_mock.Mocker() as m:
+        m.post(AUTH_URL, json={"access_token": "T1", "refresh_token": "R1", "expires_in": 3600})
+        m.post(f"{HOST}/api/v1/x", status_code=400, reason="Bad Request", text="")
+        c = _client()
+        with pytest.raises(UserException) as exc_info:
+            c.post_json("/x", {})
+    message = str(exc_info.value)
+    assert message == "UKG WFM API error on /api/v1/x: HTTP 400 Bad Request"
+    assert "—" not in message
+
+
+def test_error_detail_truncates_overlong_body():
+    # A body far exceeding the cap must be clipped to _ERROR_BODY_MAX_CHARS (+ the "…" marker).
+    long_message = "x" * 600
+    with requests_mock.Mocker() as m:
+        m.post(AUTH_URL, json={"access_token": "T1", "refresh_token": "R1", "expires_in": 3600})
+        m.post(f"{HOST}/api/v1/x", status_code=400, json={"errorCode": "E1", "message": long_message})
+        c = _client()
+        with pytest.raises(UserException) as exc_info:
+            c.post_json("/x", {})
+    detail = str(exc_info.value).split(" — ", 1)[1]
+    assert len(detail) <= _ERROR_BODY_MAX_CHARS + 1  # +1 for the trailing "…" truncation marker
+    assert len(detail) < len(long_message)
+
+
+def test_error_detail_collapses_embedded_whitespace_to_single_spaces():
+    # Embedded newlines/repeated whitespace in the error body must be collapsed to single spaces
+    # so the job log stays one readable line, not a multi-line dump.
+    with requests_mock.Mocker() as m:
+        m.post(AUTH_URL, json={"access_token": "T1", "refresh_token": "R1", "expires_in": 3600})
+        m.post(
+            f"{HOST}/api/v1/x",
+            status_code=400,
+            json={"errorCode": "E1", "message": "line one\n\n  line   two\ttabbed"},
+        )
+        c = _client()
+        with pytest.raises(UserException) as exc_info:
+            c.post_json("/x", {})
+    message = str(exc_info.value)
+    assert "\n" not in message
+    assert "\t" not in message
+    assert "  " not in message
+    assert "line one line two tabbed" in message
+
+
+def test_error_detail_swallows_unexpected_failure_and_returns_empty():
+    # If accessing the response body itself blows up, _error_detail must never propagate -- it
+    # must return "" so the original HTTPError-derived UserException surfaces undecorated.
+    class _BoomResponse:
+        @property
+        def text(self):
+            raise RuntimeError("boom")
+
+    assert _error_detail(_BoomResponse()) == ""

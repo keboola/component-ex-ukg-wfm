@@ -233,6 +233,21 @@ class Component(ComponentBase):
             return f"{resource.name}_{self._config.effective_select[0].lower()}"
         return resource.name
 
+    def _known_columns_floor(self, resource: ResourceDef) -> list[str]:
+        """This resource's static known-columns schema floor for the CURRENT output (see
+        ResourceDef.known_columns): columns known to exist for this output table, always emitted
+        (empty when this run's data omits them) regardless of which config row runs or whether that
+        row has any sticky state yet (CFTL-814 — see the long comment on ResourceDef.known_columns
+        for why a brand-new config row sharing an existing output table needs this).
+
+        Resolved via the same suffix `_output_name` uses, so the floor for
+        timekeeping_timecard_metrics_actual_totals only applies while that metric group is selected.
+        """
+        suffix = (
+            self._config.effective_select[0].lower() if resource.explode and self._config.effective_select else None
+        )
+        return resource.known_columns_floor(suffix)
+
     def _warn_legacy_metric_groups_fold(self, resource: ResourceDef) -> None:
         """Warn once per run when a config relies on the legacy `metric_groups` back-compat fold.
 
@@ -346,6 +361,7 @@ class Component(ComponentBase):
             hyperfind_threshold=self._config.hyperfind_threshold,
             batch_size=self._config.batch_size,
             window_days=self._config.window_days,
+            max_missing_employees=self._config.max_missing_employees,
         )
 
     def _stream_and_write_table(
@@ -443,15 +459,19 @@ class Component(ComponentBase):
                     resource.name,
                 )
             is_incremental = self._config.incremental and bool(primary_key)
-            # Sticky schema: union this run's columns with every column seen before (state.json) so
-            # the set never shrinks below the existing table, then persist the grown set. Columns
-            # absent this run are written empty (restval=''). This applies to full loads too, not
-            # just incremental: the output table is always native-typed, and Storage rejects a full
-            # REPLACE whose column set is narrower than the destination's schema just as it rejects a
-            # narrower incremental upsert (the "Missing columns: <field>" failure). A run that
-            # legitimately returns few rows must not drop an optional column and break the table.
+            # Sticky schema: union this run's columns with every column seen before (state.json),
+            # plus the resource's static known-columns floor (CFTL-814 — see
+            # ResourceDef.known_columns), so the set never shrinks below the existing table even for
+            # a config row whose own state.json starts out empty. Then persist the grown (now
+            # floor-inclusive) set. Columns absent this run are written empty (restval=''). This
+            # applies to full loads too, not just incremental: the output table is always
+            # native-typed, and Storage rejects a full REPLACE whose column set is narrower than the
+            # destination's schema just as it rejects a narrower incremental upsert (the "Missing
+            # columns: <field>" failure). A run that legitimately returns few rows must not drop an
+            # optional column and break the table.
             output_name = self._output_name(resource)
-            columns = self._extend_sticky_columns(output_name, list(seen_columns))
+            floor = self._known_columns_floor(resource)
+            columns = self._extend_sticky_columns(output_name, list(set(seen_columns) | set(floor)))
             schema = {
                 col: ColumnDefinition(
                     data_types=BaseType(
@@ -523,17 +543,30 @@ class Component(ComponentBase):
         returned nothing) — is there no schema to emit; there we leave the table unwritten and log
         that the destination's previous contents were kept (we cannot create a schema-less table).
         """
-        # PK resolved against the sticky columns so a prior uniqueId key (from an exploded resource)
-        # is preserved even on a zero-row run.
         output_name = self._output_name(resource)
         sticky = self._load_sticky_columns(output_name)
-        primary_key = resolve_primary_key(resource, sticky, self._config.primary_key)
+        # The known-columns floor is applied here ONLY when this row has already written this table
+        # (non-empty sticky state). CFTL-814: the output table is shared across config rows, so a row
+        # with EMPTY state has never populated it. Emitting a header-only table there would REPLACE a
+        # table another row populated with NOTHING (a full load replaces; and with no sticky columns
+        # the PK resolves empty, which forces incremental=False even for an incremental row) — i.e.
+        # silent data loss. With no state we therefore keep the pre-CFTL-814 behaviour: write nothing
+        # and preserve the destination. The floor still does its job on the rows-present path, which
+        # is where the "Missing columns" failure actually occurs.
+        floor = self._known_columns_floor(resource)
+        known = sorted(set(sticky) | set(floor)) if sticky else sticky
+        # PK resolved against the known columns so a prior uniqueId key (from an exploded resource)
+        # is preserved even on a zero-row run.
+        primary_key = resolve_primary_key(resource, known, self._config.primary_key)
         is_incremental = self._config.incremental and bool(primary_key)
         # Re-emit the full accumulated column set (from state) so a zero-row run still matches the
-        # existing table's schema, with PK columns as the anchor. Applies to full loads too: a
-        # native-typed table rejects a REPLACE with a narrower column set. A keyless resource with no
-        # columns ever seen has no schema to emit, so we keep the destination's previous contents.
-        header_cols = sorted(set(primary_key) | set(sticky))
+        # existing table's schema, with PK columns as the anchor, UNIONED with the resource's static
+        # known-columns floor (CFTL-814 — see ResourceDef.known_columns) so a brand-new config row
+        # with EMPTY state (no sticky columns yet) still emits the full known schema on its very
+        # first, zero-row run. Applies to full loads too: a native-typed table rejects a REPLACE with
+        # a narrower column set. A keyless resource with no columns ever seen and no floor has no
+        # schema to emit, so we keep the destination's previous contents.
+        header_cols = sorted(set(primary_key) | set(known))
         if not header_cols:
             logging.info(
                 "No rows returned for resource '%s' and no primary key to build a header from; "

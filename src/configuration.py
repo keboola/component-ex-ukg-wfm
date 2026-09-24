@@ -77,6 +77,12 @@ class Configuration(BaseModel):
     # resource with a large per-employee payload risks the 256 MB memory limit (the whole batch
     # response is parsed at once), raise it to cut request count. Default None = registry value.
     batch_size: int | None = Field(default=None, ge=1)
+    # Timecard-metrics/accruals-only failure threshold for employees UKG silently omits via
+    # partial_success=true (see orchestration._reconcile_employee_set_metrics). Omissions are always
+    # logged; when this is set, a run that omits MORE than this many employees FAILS (UserException)
+    # instead of loading a silently-incomplete table. Default None preserves today's behaviour exactly
+    # (warn only, never fail) so existing configs are unaffected.
+    max_missing_employees: int | None = Field(default=None, ge=0)
 
     def __init__(self, **data: Any):
         try:
