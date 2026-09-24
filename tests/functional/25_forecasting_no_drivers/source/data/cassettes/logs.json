@@ -1,6 +1,6 @@
 {
   "exit_code": 1,
-  "stderr": "UKG WFM API error on /api/v1/forecasting/volume_forecasts/multi_read: HTTP 400 Bad Request\n",
+  "stderr": "UKG WFM API error on /api/v1/forecasting/volume_forecasts/multi_read: HTTP 400 Bad Request — WFF-270001: REDACTED\n",
   "logs": [
     {
       "level": "INFO",
@@ -11,7 +11,7 @@
     {
       "level": "ERROR",
       "logger": "root",
-      "message": "UKG WFM API error on /api/v1/forecasting/volume_forecasts/multi_read: HTTP 400 Bad Request",
+      "message": "UKG WFM API error on /api/v1/forecasting/volume_forecasts/multi_read: HTTP 400 Bad Request — WFF-270001: REDACTED",
       "timestamp": "2026-07-23T17:18:54.000Z"
     }
   ]

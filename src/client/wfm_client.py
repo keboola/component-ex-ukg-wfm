@@ -1,4 +1,5 @@
 import logging
+import re
 import time
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -11,6 +12,58 @@ from keboola.component.exceptions import UserException
 _TOKEN_SAFETY_MARGIN_S = 60
 _RETRIABLE_STATUS = frozenset({408, 429})
 _BACKOFF_MIN_WAIT_S = 1.0
+# Cap on how much of a UKG error body we surface in a job log — enough to see errorCode/message
+# (and any nested detail) without dumping an oversized/binary body into the log.
+_ERROR_BODY_MAX_CHARS = 500
+
+
+def _error_detail(resp: requests.Response) -> str:
+    """Best-effort extraction of UKG's error body (errorCode/message) for the job log.
+
+    Per https://developer.ukg.com/wfm/docs/error-handling-doc UKG puts the actionable detail
+    (errorCode, message) in the response BODY, not the HTTP reason phrase — "HTTP 400 Bad Request"
+    alone left a customer's failed job undiagnosable. Tries the common shapes:
+      {"errorCode": ..., "message": ...}
+      {"errors": [{"errorCode": ..., "message": ...}, ...]}   (envelope)
+      [{"errorCode": ..., "message": ...}, ...]               (bare list)
+    and falls back to the raw response text when the body isn't JSON or has none of those keys.
+    Never raises — a failure to parse the error body must never mask the original HTTP error — and
+    always truncates/collapses whitespace so one bad body can't blow up the job log.
+    """
+    try:
+        text = resp.text
+        if not text:
+            return ""
+        try:
+            body: Any = resp.json()
+        except ValueError:
+            return _clip(text)
+        entry = body
+        if isinstance(entry, dict):
+            # Nested error envelope: take the first entry, else fall back to the dict itself.
+            nested = entry.get("errors")
+            if isinstance(nested, list) and nested:
+                entry = nested[0]
+        elif isinstance(entry, list) and entry:
+            entry = entry[0]
+        if isinstance(entry, dict):
+            code = entry.get("errorCode") or entry.get("error_code")
+            message = entry.get("message")
+            if code or message:
+                parts = [str(p) for p in (code, message) if p]
+                return _clip(": ".join(parts))
+        return _clip(text)
+    except Exception:
+        # Never let error-detail extraction mask the original HTTPError.
+        return ""
+
+
+def _clip(text: str) -> str:
+    """Collapse whitespace/newlines and cap length so the job log stays readable."""
+    collapsed = re.sub(r"\s+", " ", text).strip()
+    if len(collapsed) > _ERROR_BODY_MAX_CHARS:
+        return collapsed[:_ERROR_BODY_MAX_CHARS] + "…"
+    return collapsed
 
 
 def _endpoint(url: str) -> str:
@@ -144,7 +197,11 @@ class WfmClient:
         except requests.HTTPError as e:
             status = e.response.status_code if e.response is not None else "unknown"
             reason = e.response.reason if e.response is not None else ""
-            raise UserException(f"UKG WFM API error on {_endpoint(url)}: HTTP {status} {reason}") from e
+            message = f"UKG WFM API error on {_endpoint(url)}: HTTP {status} {reason}"
+            detail = _error_detail(e.response) if e.response is not None else ""
+            if detail:
+                message = f"{message} — {detail}"
+            raise UserException(message) from e
         try:
             return resp.json()
         except ValueError as e:

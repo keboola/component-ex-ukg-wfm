@@ -105,6 +105,25 @@ Incremental & windowing
   full loads too, so a keyless full-replace resource that has emitted columns before now writes an
   empty table rather than retaining stale contents. Only a keyless resource that has never emitted any
   column has nothing to write, and there the destination's previous contents are kept.
+- **Known-columns floor (schema stability across config rows).** An output table is named from the
+  resource + metric group only, so several config rows can legitimately write into ONE table — but the
+  "columns seen on prior runs" memory lives in `state.json`, which Keboola scopes **per config row**.
+  A brand-new row therefore starts with no memory, and if its data omitted an optional column the
+  shared table already had, the load failed with `Some columns are missing in the csv file`. Resources
+  may now declare a static **known-columns floor** (`ResourceDef.known_columns`) that is always
+  emitted — absent values written empty — so the schema is a property of the resource, not of one
+  row's history. Currently populated for `timekeeping_timecard_metrics` / `ACTUAL_TOTALS`; it must be
+  re-derived if UKG adds fields. The floor is deliberately **not** applied to the zero-row path of a
+  row with no state, so a fresh row that returns nothing still writes nothing and cannot truncate a
+  table another row populated.
+- **Dropped employees are reported.** Timecard-metrics and accruals are read with
+  `partial_success=true`, which lets UKG silently omit employees the API user cannot fully access.
+  Each run compares the employees requested against those returned and **warns** with the missing
+  count (plus a capped sample of ids). Set **`max_missing_employees`** to fail the run instead once
+  the omission count exceeds it; leave it empty to only warn (the default).
+- **API errors carry UKG's own error code and message.** A rejection logs
+  `HTTP 400 Bad Request — <errorCode>: <message>` read from the response body, instead of the bare
+  status, so a failure is diagnosable from the job log.
 - **Incremental upsert requires a primary key.** A resource upserts incrementally only when a primary
   key exists — either its registry default or one supplied via the row's `primary_key` field. A
   registry-keyless resource with no user-supplied `primary_key` always runs full-replace
