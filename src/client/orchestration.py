@@ -127,6 +127,69 @@ def _paginate_apply_read(
             return
 
 
+def _employee_id_in_record(record: dict[str, Any]) -> int | None:
+    """Pull the employee id off a (pre-flatten) EMPLOYEE_SET_METRICS record for reconciliation.
+
+    The record carries an `employeeId` OBJECT ({"id","qualifier",...}), flattened downstream to
+    `employeeId_id` by transform.flatten_record — but reconciliation runs on the raw record before
+    that flattening. Fall back to an `employee` key defensively (not observed live, but the response
+    shape is not formally documented beyond the reference), and skip anything uncoercible to int so
+    a malformed id never crashes the count, only drops out of the comparison.
+    """
+    ref = record.get("employeeId")
+    if ref is None:
+        ref = record.get("employee")
+    if isinstance(ref, dict):
+        ref = ref.get("id")
+    if ref is None:
+        return None
+    try:
+        return int(ref)
+    except (TypeError, ValueError):
+        return None
+
+
+def _reconcile_employee_set_metrics(
+    resource_name: str,
+    requested_ids: set[int],
+    returned_ids: set[int],
+    max_missing_employees: int | None,
+) -> None:
+    """Surface (and optionally fail on) employees UKG silently dropped via partial_success=true.
+
+    EMPLOYEE_SET_METRICS reads are sent with partial_success=true (see paginate_multi_read) so the
+    API doesn't 4xx when the caller lacks full visibility into one employee in the batch — instead it
+    just OMITS that employee from the response, with no error and no other signal. Without this
+    comparison, rows vanish silently. max_missing_employees is opt-in (None = warn only, preserving
+    the pre-existing behaviour); set it to fail the run when the omission count is unacceptable.
+    """
+    missing = requested_ids - returned_ids
+    if not missing:
+        # Deliberately silent on the happy path: this runs on EVERY successful EMPLOYEE_SET_METRICS
+        # read, so a "nothing missing" line would be pure noise in every job log (and would churn the
+        # functional log fixtures). Only an actual omission is worth the operator's attention.
+        return
+    sample = sorted(missing)[:10]
+    logging.warning(
+        "Resource '%s': UKG omitted %s of %s requested employees from the response (sample of up to 10 "
+        "missing employee ids: %s). This endpoint is read with partial_success=true, which lets UKG "
+        "silently drop employees the API user cannot fully access — check the API user's permissions "
+        "and the Hyperfind scope if this is unexpected.",
+        resource_name,
+        len(missing),
+        len(requested_ids),
+        sample,
+    )
+    if max_missing_employees is not None and len(missing) > max_missing_employees:
+        raise UserException(
+            f"Resource '{resource_name}': UKG omitted {len(missing)} of {len(requested_ids)} requested "
+            f"employees, exceeding the configured max_missing_employees ({max_missing_employees}). This "
+            "endpoint uses partial_success=true, which lets UKG silently drop employees the API user "
+            "cannot fully access — check the API user's permissions / the Hyperfind scope, or raise "
+            "max_missing_employees if this level of omission is expected."
+        )
+
+
 def chunk_and_read(
     client: WfmClient,
     resource: ResourceDef,
@@ -139,15 +202,32 @@ def chunk_and_read(
     page_size: int | None = None,
     max_pages: int | None = None,
     batch_size: int | None = None,
+    max_missing_employees: int | None = None,
 ) -> Iterator[dict[str, Any]]:
     # A config batch_size overrides the registry default so a run can shrink the per-request payload
     # (the whole batch response is parsed into memory) below the component memory limit.
     chunk_size = batch_size or resource.batch_limit or len(emp_ids) or 1
     chunks = _initial_chunks(emp_ids, chunk_size) if emp_ids else [[]]
+    # Reconciliation (see _reconcile_employee_set_metrics) is EMPLOYEE_SET_METRICS-only: that is the
+    # one family read with partial_success=true, so it is the only one where UKG can silently omit a
+    # requested employee. requested/returned accumulate across every chunk (this is a generator, so
+    # the actual comparison + single summary log only happens once every chunk is exhausted below).
+    track_missing = resource.body_style == BodyStyle.EMPLOYEE_SET_METRICS
+    requested_ids: set[int] = set()
+    returned_ids: set[int] = set()
     for chunk in chunks:
-        yield from _read_chunk_with_shrink(
+        if track_missing:
+            requested_ids.update(chunk)
+        for record in _read_chunk_with_shrink(
             client, resource, chunk, since_iso, until_iso, select, symbolic_period, hyperfind_ref, page_size, max_pages
-        )
+        ):
+            if track_missing:
+                emp_id = _employee_id_in_record(record)
+                if emp_id is not None:
+                    returned_ids.add(emp_id)
+            yield record
+    if track_missing and requested_ids:
+        _reconcile_employee_set_metrics(resource.name, requested_ids, returned_ids, max_missing_employees)
 
 
 def _read_chunk_with_shrink(
@@ -399,6 +479,7 @@ def iter_records(
     hyperfind_threshold: int = 50000,
     batch_size: int | None = None,
     window_days: int | None = None,
+    max_missing_employees: int | None = None,
 ) -> Iterator[dict[str, Any]]:
     emp_ids: list[int] = []
     if resource.employee_scope == EmployeeScope.HYPERFIND:
@@ -419,7 +500,18 @@ def iter_records(
     # caller has already skipped window/watermark logic, so read once with the symbolic bound.
     if symbolic_period:
         yield from chunk_and_read(
-            client, resource, emp_ids, "", "", select, symbolic_period, hyperfind_ref, page_size, max_pages, batch_size
+            client,
+            resource,
+            emp_ids,
+            "",
+            "",
+            select,
+            symbolic_period,
+            hyperfind_ref,
+            page_size,
+            max_pages,
+            batch_size,
+            max_missing_employees,
         )
         return
 
@@ -459,6 +551,7 @@ def iter_records(
                 page_size,
                 max_pages,
                 batch_size,
+                max_missing_employees,
             )
     else:
         yield from chunk_and_read(
@@ -473,4 +566,5 @@ def iter_records(
             page_size,
             max_pages,
             batch_size,
+            max_missing_employees,
         )

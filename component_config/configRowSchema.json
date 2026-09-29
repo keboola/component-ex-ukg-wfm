@@ -133,6 +133,24 @@
       },
       "propertyOrder": 43
     },
+    "max_missing_employees": {
+      "type": "integer",
+      "title": "Max Missing Employees",
+      "description": "Fail the run if UKG silently omits more than this many employees from a Timecard Metrics / Accruals response. Leave empty to only warn (default, back-compatible behaviour).",
+      "minimum": 0,
+      "options": {
+        "tooltip": "Timecard Metrics and Accruals (Balances, Transactions, Summaries) are read with partial_success=true, which lets UKG silently omit employees the API user cannot fully access instead of failing the whole request. Every omission is always logged as a warning. Set this to fail the run (instead of loading a silently-incomplete table) once the number of omitted employees exceeds this count — 0 means any omission fails. Leave empty to only warn and never fail, which preserves today's default behaviour.",
+        "dependencies": {
+          "resource": [
+            "timekeeping_timecard_metrics",
+            "accruals_balances",
+            "accruals_transactions",
+            "accruals_summaries"
+          ]
+        }
+      },
+      "propertyOrder": 44
+    },
     "payroll_query": {
       "type": "string",
       "format": "textarea",

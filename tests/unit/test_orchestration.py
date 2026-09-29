@@ -1,4 +1,6 @@
+import ast
 import logging
+import re
 
 import pytest
 import requests_mock
@@ -517,6 +519,129 @@ def test_rollup_resource_never_date_split_even_over_multiple_years():
     # One request covering the whole range, not 3 (365-day) or 24 (window_days) partial-period reads.
     assert len(ranges) == 1
     assert ranges[0] == {"startDate": "2024-01-01", "endDate": "2026-01-01"}
+
+
+# --- CFTL-814: EMPLOYEE_SET_METRICS partial_success reconciliation -----------------------------
+
+
+def test_employee_set_metrics_warns_on_missing_employees_without_max_set(caplog):
+    # UKG's partial_success=true can silently omit employees the caller can't fully access.
+    # 3 requested, only 1 returned (2 omitted) -> a WARNING naming the missing count, no raise
+    # (max_missing_employees defaults to None).
+    res = get_resource("timekeeping_timecard_metrics")  # EMPLOYEE_SET_METRICS
+    with requests_mock.Mocker() as m:
+        c = _client(m)
+        m.post(
+            f"{HOST}/api/v1{res.endpoint_path}",
+            json=[{"employeeId": {"id": 1}, "actualTotals": []}],
+        )
+        with caplog.at_level(logging.WARNING):
+            rows = list(chunk_and_read(c, res, [1, 2, 3], "2026-01-01", "2026-02-01", ["ACTUAL_TOTALS"]))
+    assert len(rows) == 1
+    warnings = [r.getMessage() for r in caplog.records if r.levelname == "WARNING"]
+    assert any("omitted 2 of 3" in msg for msg in warnings)
+
+
+def test_employee_set_metrics_no_warning_when_all_employees_returned(caplog):
+    # A complete response (every requested id came back) must not log any WARNING.
+    res = get_resource("timekeeping_timecard_metrics")
+    with requests_mock.Mocker() as m:
+        c = _client(m)
+        m.post(
+            f"{HOST}/api/v1{res.endpoint_path}",
+            json=[
+                {"employeeId": {"id": 1}, "actualTotals": []},
+                {"employeeId": {"id": 2}, "actualTotals": []},
+                {"employeeId": {"id": 3}, "actualTotals": []},
+            ],
+        )
+        with caplog.at_level(logging.WARNING):
+            rows = list(chunk_and_read(c, res, [1, 2, 3], "2026-01-01", "2026-02-01", ["ACTUAL_TOTALS"]))
+    assert len(rows) == 3
+    assert not any(r.levelname == "WARNING" for r in caplog.records)
+
+
+def test_employee_set_metrics_warning_caps_missing_id_sample_at_ten(caplog):
+    # 15 requested, 0 returned -> 15 missing. The warning must name the missing COUNT (15) but
+    # never dump more than a 10-id sample, so one badly-scoped Hyperfind can't flood the job log.
+    res = get_resource("timekeeping_timecard_metrics")
+    emp_ids = list(range(1, 16))
+    with requests_mock.Mocker() as m:
+        c = _client(m)
+        m.post(f"{HOST}/api/v1{res.endpoint_path}", json=[])
+        with caplog.at_level(logging.WARNING):
+            rows = list(chunk_and_read(c, res, emp_ids, "2026-01-01", "2026-02-01", ["ACTUAL_TOTALS"]))
+    assert rows == []
+    warnings = [r.getMessage() for r in caplog.records if r.levelname == "WARNING"]
+    assert any("omitted 15 of 15" in msg for msg in warnings)
+    match = next(re.search(r"missing employee ids: (\[[^\]]*\])", msg) for msg in warnings if "omitted" in msg)
+    sample_ids = ast.literal_eval(match.group(1))
+    assert len(sample_ids) <= 10
+    assert sample_ids == list(range(1, 11))
+
+
+def test_employee_set_metrics_max_missing_employees_not_exceeded_does_not_raise(caplog):
+    # max_missing_employees set HIGHER than the actual omission count must not raise -- only warn,
+    # same as the default (unset) behaviour.
+    res = get_resource("timekeeping_timecard_metrics")
+    with requests_mock.Mocker() as m:
+        c = _client(m)
+        m.post(
+            f"{HOST}/api/v1{res.endpoint_path}",
+            json=[{"employeeId": {"id": 1}, "actualTotals": []}],
+        )
+        with caplog.at_level(logging.WARNING):
+            rows = list(
+                chunk_and_read(
+                    c, res, [1, 2, 3], "2026-01-01", "2026-02-01", ["ACTUAL_TOTALS"], max_missing_employees=5
+                )
+            )
+    assert len(rows) == 1
+    warnings = [r.getMessage() for r in caplog.records if r.levelname == "WARNING"]
+    assert any("omitted 2 of 3" in msg for msg in warnings)
+
+
+def test_employee_set_metrics_max_missing_employees_raises_when_exceeded():
+    # max_missing_employees is opt-in: when the omission count exceeds it, the run must fail loudly
+    # rather than silently ship a partial table.
+    res = get_resource("timekeeping_timecard_metrics")
+    with requests_mock.Mocker() as m:
+        c = _client(m)
+        m.post(
+            f"{HOST}/api/v1{res.endpoint_path}",
+            json=[{"employeeId": {"id": 1}, "actualTotals": []}],
+        )
+        with pytest.raises(UserException, match="max_missing_employees"):
+            list(
+                chunk_and_read(
+                    c, res, [1, 2, 3], "2026-01-01", "2026-02-01", ["ACTUAL_TOTALS"], max_missing_employees=0
+                )
+            )
+
+
+def test_employee_set_metrics_max_missing_employees_none_never_raises():
+    # Explicit None (the default) must warn-only regardless of how many employees are missing.
+    res = get_resource("timekeeping_timecard_metrics")
+    with requests_mock.Mocker() as m:
+        c = _client(m)
+        m.post(f"{HOST}/api/v1{res.endpoint_path}", json=[])
+        rows = list(
+            chunk_and_read(c, res, [1, 2, 3], "2026-01-01", "2026-02-01", ["ACTUAL_TOTALS"], max_missing_employees=None)
+        )
+    assert rows == []
+
+
+def test_non_employee_set_metrics_resource_never_reconciles(caplog):
+    # Reconciliation is EMPLOYEE_SET_METRICS-only: a plain multi_read returning fewer records than
+    # requested employees (e.g. some employees simply have no timecard) must never warn about it.
+    res = get_resource("timekeeping_timecards")  # WHERE_EMPLOYEES_IDS, not EMPLOYEE_SET_METRICS
+    with requests_mock.Mocker() as m:
+        c = _client(m)
+        m.post(f"{HOST}/api/v1{res.endpoint_path}", json={"records": [{"id": 1}]})
+        with caplog.at_level(logging.WARNING):
+            rows = list(chunk_and_read(c, res, [1, 2, 3], "2026-01-01", "2026-02-01", []))
+    assert len(rows) == 1
+    assert not any(r.levelname == "WARNING" for r in caplog.records)
 
 
 def test_no_window_days_keeps_single_request_under_a_year():

@@ -112,6 +112,29 @@ class ResourceDef(BaseModel):
     # timecard_metrics so the chosen metric section becomes per-line-item rows; the PK is then
     # resolved dynamically (resolve_primary_key) rather than from a static registry key.
     explode: bool = False
+    # A static schema FLOOR for this resource's output, keyed by the lowercased metric-group /
+    # output-name suffix (the same suffix Component._output_name() appends, e.g. "actual_totals").
+    # These are columns KNOWN to exist for that output table — always emitted (empty when a given
+    # run's data omits them) regardless of which config row runs or whether that row has any sticky
+    # state yet.
+    #
+    # ROOT CAUSE (CFTL-814): the output table is derived from resource.name + metric group ONLY, not
+    # the config row id, so several config rows (e.g. different Hyperfinds or date ranges) can
+    # legitimately write into ONE shared Storage table. The column set that guarantees a run's CSV
+    # never has fewer columns than the destination lives in state.json, which Keboola scopes PER
+    # CONFIG ROW — a newly created row starts with EMPTY state. If that new row's data happens to
+    # omit an optional field the shared table already has (observed in production: `payPeriodWeek`
+    # missing from a `timekeeping_timecard_metrics_actual_totals` run), the load fails with "Some
+    # columns are missing in the csv file". Making the floor a property of the RESOURCE (this field)
+    # rather than of one row's run history fixes that: it is unioned in alongside the sticky state
+    # (see Component._known_columns_floor / _extend_sticky_columns / _write_empty_table) so the
+    # emitted schema is deterministic from the first run of any row. Empty (the default) = no change
+    # for every other resource.
+    known_columns: dict[str, list[str]] = Field(default_factory=dict)
+
+    def known_columns_floor(self, suffix: str | None) -> list[str]:
+        """The known-columns schema floor for this resource's `suffix`-keyed output (see above)."""
+        return self.known_columns.get(suffix, []) if suffix else []
 
     @property
     def window_chunkable(self) -> bool:
@@ -252,6 +275,50 @@ RESOURCE_REGISTRY: dict[str, ResourceDef] = {
         # Exploded to per-line-item rows; the PK is uniqueId when present (resolve_primary_key), so
         # the registry key is empty (dynamic). accruals keep employeeId_id — they are not exploded.
         primary_key=[],
+        # Known-columns schema floor (see ResourceDef.known_columns) for the ACTUAL_TOTALS metric
+        # group's output table. VERIFIED: this is the column set from a successful production run's
+        # stored Storage schema for timekeeping_timecard_metrics_actual_totals — always emit these,
+        # empty when a given run's data omits one (e.g. `payPeriodWeek`, an optional field not every
+        # entry carries), so a brand-new config row sharing that table never narrows its schema.
+        known_columns={
+            "actual_totals": [
+                "amountType",
+                "applyDate",
+                "combined",
+                "daysAmount",
+                "employeeId_id",
+                "employeeId_name",
+                "employeeId_qualifier",
+                "employee_id",
+                "employee_name",
+                "employee_qualifier",
+                "hoursAmount",
+                "isFromCorrection",
+                "jobTransfer",
+                "job_id",
+                "job_name",
+                "job_qualifier",
+                "laborCategories_entries",
+                "laborCategories_laborString",
+                "laborCategories_referenceId",
+                "laborTransfer",
+                "payCode_id",
+                "payCode_name",
+                "payCode_qualifier",
+                "payPeriodNumber",
+                "payPeriodWeek",
+                "position_id",
+                "position_name",
+                "position_qualifier",
+                "signedOff",
+                "uniqueId",
+                "wageAddition",
+                "wageMultiplier",
+                "wages",
+                "wagesCurrency_amount",
+                "wagesCurrency_currencyCode",
+            ]
+        },
     ),
     # VERIFIED: /scheduling/schedule/multi_read returns a COMPOSITE of entity lists (shifts,
     # scheduleDayList, openShifts, holidays, ...). Three registry resources share this one
@@ -572,6 +639,13 @@ def resolve_primary_key(
     carry it (Actual/Scheduled/… totals) upsert incrementally with a real applyDate column. A
     section without `uniqueId`, and every non-exploded resource, falls back to effective_primary_key
     (user-supplied `primary_key` over the registry default).
+
+    NOTE (CFTL-814): letting an explicit user `primary_key` win over `uniqueId` was considered and
+    deliberately NOT done here. `uniqueId` is `employeeId:applyDate:payCode`, which a customer
+    reported is not unique when one employee works several jobs in a day — but that collision is not
+    reproduced by any sample we have, and re-keying an EXISTING output table is not a supported
+    in-place Storage operation and would collapse line items under an upsert. It needs a confirmed
+    collision example and a table migration, so it is tracked separately rather than changed here.
     """
     if resource.explode and _EXPLODE_PK in seen_columns:
         return [_EXPLODE_PK]

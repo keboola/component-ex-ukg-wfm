@@ -127,10 +127,13 @@ def test_empty_metric_group_refused_for_timecard_metrics():
 
 def test_metric_group_set_passes_the_guard(monkeypatch):
     # With a metric_group set, run() passes the guard and proceeds to fetch (which we stub to no-op).
+    # SCHEDULED_TOTALS (not ACTUAL_TOTALS) deliberately: it has no known-columns floor (see
+    # ResourceDef.known_columns / CFTL-814), so the zero-row path stays a true no-op (no header
+    # table written) and this test can keep exercising only the guard without a real datadir.
     comp = _comp(
         resource="timekeeping_timecard_metrics",
         since="2026-01-01T00:00:00+00:00",
-        metric_group="ACTUAL_TOTALS",
+        metric_group="SCHEDULED_TOTALS",
     )
     monkeypatch.setattr(comp, "_record_source", lambda *a, **k: iter([]))  # short-circuit before HTTP
     # comp bypasses __init__ (see _comp), so it has no data_folder_path; stub the state read the
