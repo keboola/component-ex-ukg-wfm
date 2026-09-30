@@ -145,7 +145,7 @@ def _employee_id_in_record(record: dict[str, Any]) -> int | None:
         return None
     try:
         return int(ref)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
 
 
@@ -527,15 +527,20 @@ def iter_records(
         # each response small enough to parse under the memory limit, BUT only per-event resources
         # can be split by date without changing row semantics:
         #   - punch-style endpoints MUST split by their per-call minute cap (<= 60 min);
-        #   - window-chunkable per-event resources split by `window_days` (else 365-day pieces);
+        #   - window-chunkable per-event resources split by `window_days` (else the resource
+        #     default, else 365-day pieces);
+        #   - an EMPLOYEE_SET_METRICS read of a per-line-item metric group (ACTUAL_TOTALS) is
+        #     chunkable too — its rows carry their own applyDate, so sub-windows partition the rows
+        #     (see ResourceDef.chunkable_select). That is decided from `select`, hence
+        #     is_window_chunkable(select) rather than the resource-level property;
         #   - everything else (EMPLOYEE_SET_METRICS rollups, net-change) is read as ONE window —
         #     splitting a period rollup would emit a partial-period row per sub-window (collapsing
         #     under the employeeId_id upsert or inflating a full load), so it is never date-split,
         #     regardless of range length. Memory for those is controlled with `batch_size`.
         if resource.window_max_minutes > 0:
             windows = split_date_windows(start, end, max_minutes=resource.window_max_minutes)
-        elif resource.window_chunkable:
-            windows = split_date_windows(start, end, max_days=window_days or 365)
+        elif resource.is_window_chunkable(select):
+            windows = split_date_windows(start, end, max_days=resource.window_days_for(select, window_days))
         else:
             windows = [(start, end)]
         for w_start, w_end in windows:

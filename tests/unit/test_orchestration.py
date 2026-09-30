@@ -486,12 +486,15 @@ def test_window_days_splits_pull_into_sub_windows():
 
 
 def test_rollup_resource_never_date_split_even_over_multiple_years():
-    # A rollup resource (EMPLOYEE_SET_METRICS) is not window-chunkable, so its window is NEVER date
-    # split — not by window_days, and (critically) not by the 365-day default either. A 2-year
-    # backfill must issue ONE request, or each employee's period rollup would be split into
-    # partial-period rows (collapsing under the employeeId_id upsert / inflating a full load).
+    # A rollup metric group (EMPLOYEE_SET_METRICS, e.g. SCHEDULED_TOTALS) is not window-chunkable,
+    # so its window is NEVER date split — not by window_days, and (critically) not by the 365-day
+    # default either. A 2-year backfill must issue ONE request, or each employee's period rollup
+    # would be split into partial-period rows (collapsing under the employeeId_id upsert /
+    # inflating a full load). Only the per-line-item groups in chunkable_select are exempt
+    # (CFTL-814 item 3 — see the ACTUAL_TOTALS test below).
     res = get_resource("timekeeping_timecard_metrics")
     assert res.window_chunkable is False
+    assert res.is_window_chunkable(["SCHEDULED_TOTALS"]) is False
     ranges: list[dict] = []
     with requests_mock.Mocker() as m:
         c = _client(m)
@@ -512,7 +515,7 @@ def test_rollup_resource_never_date_split_even_over_multiple_years():
                 hyperfind_ref="253",
                 since_iso="2024-01-01T00:00:00+00:00",
                 until_iso="2026-01-01T00:00:00+00:00",  # ~731 days -> would be 3 windows if split
-                select=["ACTUAL_TOTALS"],
+                select=["SCHEDULED_TOTALS"],
                 window_days=30,
             )
         )
@@ -665,3 +668,60 @@ def test_no_window_days_keeps_single_request_under_a_year():
             )
         )
     assert read.call_count == 1
+
+
+# --- CFTL-814 item 3: ACTUAL_TOTALS is per-line-item, so its window IS splittable ---------------
+
+
+def _timecard_metrics_ranges(m, res, **kwargs) -> list[dict]:
+    """Run iter_records against a mocked timecard_metrics endpoint, returning each request's
+    dateRange."""
+    ranges: list[dict] = []
+    c = _client(m)
+    m.post(
+        f"{HOST}/api/v1/commons/hyperfind/execute",
+        json={"count": 1, "result": {"refs": [{"id": 7}], "basePersons": []}},
+    )
+
+    def _capture(request, context):
+        ranges.append(request.json()["where"]["employeeSet"].get("dateRange"))
+        return [{"employeeId": {"id": 7}, "actualTotals": [{"uniqueId": "7:2026-01-01:152"}]}]
+
+    m.post(f"{HOST}/api/v1{res.endpoint_path}", json=_capture)
+    list(iter_records(c, res, hyperfind_ref="253", **kwargs))
+    return ranges
+
+
+def test_actual_totals_window_is_split_by_configured_window_days():
+    # The customer's ask: pull timecard metrics in shorter date ranges. ACTUAL_TOTALS rows are
+    # per-line-item (each carries applyDate), so the union of sub-windows equals the full window.
+    res = get_resource("timekeeping_timecard_metrics")
+    with requests_mock.Mocker() as m:
+        ranges = _timecard_metrics_ranges(
+            m,
+            res,
+            since_iso="2026-01-01T00:00:00+00:00",
+            until_iso="2026-04-01T00:00:00+00:00",  # 90 days
+            select=["ACTUAL_TOTALS"],
+            window_days=30,
+        )
+    assert len(ranges) == 3
+    assert ranges[0]["startDate"] == "2026-01-01"
+    assert ranges[-1]["endDate"] == "2026-04-01"
+    # Inclusive endDate: adjacent windows must not share a boundary day (else duplicate rows).
+    assert {r["endDate"] for r in ranges}.isdisjoint({r["startDate"] for r in ranges})
+
+
+def test_actual_totals_window_uses_21_day_default_when_unset():
+    # No window_days configured -> the resource default (21 days) applies, so a long pull is
+    # chunked without the user having to know about the field. 63 days / 21 -> 3 windows.
+    res = get_resource("timekeeping_timecard_metrics")
+    with requests_mock.Mocker() as m:
+        ranges = _timecard_metrics_ranges(
+            m,
+            res,
+            since_iso="2026-01-01T00:00:00+00:00",
+            until_iso="2026-03-05T00:00:00+00:00",  # 63 days
+            select=["ACTUAL_TOTALS"],
+        )
+    assert len(ranges) == 3

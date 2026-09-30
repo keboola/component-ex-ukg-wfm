@@ -276,10 +276,9 @@ def test_zero_row_incremental_load_does_not_warn(tmp_path, monkeypatch, caplog):
     assert not any(record.levelname == "WARNING" for record in caplog.records)
 
 
-def test_user_primary_key_overridden_by_unique_id_warns(tmp_path, monkeypatch, caplog):
-    """An exploded resource whose rows carry `uniqueId` always keys on it, even when the user
-    configured a different primary_key. That override is correct but silent otherwise — it must
-    warn so the user understands why their configured PK was not used."""
+def test_user_primary_key_is_honoured_for_exploded_resource(tmp_path, monkeypatch, caplog):
+    """CFTL-814 item 4: a configured primary_key is the escape hatch for a tenant whose line items
+    need a wider key, so it is used as-is. Before the fix uniqueId silently replaced it."""
     params = {
         **_PARAMS,
         "resource": "timekeeping_timecard_metrics",
@@ -305,12 +304,96 @@ def test_user_primary_key_overridden_by_unique_id_warns(tmp_path, monkeypatch, c
 
     assert row_count == 1
     cols = _schema_by_col(tmp_path / "data", "timekeeping_timecard_metrics_actual_totals")
-    assert cols["uniqueId"]["primary_key"] is True
-    assert cols["employeeId_id"].get("primary_key", False) is False
-    assert any(
-        "employeeId_id" in record.message and "uniqueId" in record.message and record.levelname == "WARNING"
-        for record in caplog.records
+    assert cols["employeeId_id"]["primary_key"] is True
+    assert cols["uniqueId"].get("primary_key", False) is False
+    # Nothing was overridden, so there is no override warning to emit.
+    assert not any(record.levelname == "WARNING" for record in caplog.records)
+
+
+def test_exploded_full_load_writes_no_primary_key_and_warns_about_migration(tmp_path, monkeypatch, caplog):
+    """CFTL-814 item 4: on FULL load the exploded table is written WITHOUT a primary key.
+
+    uniqueId is employee:date:payCode, which repeats when one employee works several jobs on one
+    day; Storage keeps one row per key on import, so a keyed full load silently dropped those
+    lines. The run must also tell the user that an existing keyed table has to be deleted once,
+    because Storage cannot remove a primary key in place.
+    """
+    params = {
+        **_PARAMS,
+        "resource": "timekeeping_timecard_metrics",
+        "load_type": "full_load",
+        "metric_group": "ACTUAL_TOTALS",
+    }
+    component = _build_component(tmp_path, monkeypatch, params)
+    resource = get_resource("timekeeping_timecard_metrics")
+
+    records = iter(
+        [
+            {
+                "employeeId": {"id": 90001},
+                "actualTotals": [
+                    # The reported collision: one uniqueId, two jobs, two line items (ids anonymized).
+                    {
+                        "uniqueId": "90001:2026-09-12:152",
+                        "applyDate": "2026-09-12",
+                        "hoursAmount": 8.98,
+                        "job": {"id": 701},
+                    },
+                    {
+                        "uniqueId": "90001:2026-09-12:152",
+                        "applyDate": "2026-09-12",
+                        "hoursAmount": 2.43,
+                        "job": {"id": 702},
+                    },
+                ],
+            }
+        ]
     )
+    with caplog.at_level("WARNING"):
+        row_count, _ = component._stream_and_write_table(resource, records)
+
+    # Both line items are kept — that is the point of dropping the key.
+    assert row_count == 2
+    manifest = _manifest(tmp_path / "data", "timekeeping_timecard_metrics_actual_totals")
+    assert manifest.get("primary_key", []) == []
+    assert manifest.get("incremental") is False
+    cols = _schema_by_col(tmp_path / "data", "timekeeping_timecard_metrics_actual_totals")
+    assert not any(col.get("primary_key") for col in cols.values())
+    assert any(
+        "without a primary key" in record.message.lower() and "delete it once" in record.message.lower()
+        for record in caplog.records
+        if record.levelname == "WARNING"
+    )
+
+
+def test_exploded_incremental_keeps_uniqueid_and_warns_it_is_lossy(tmp_path, monkeypatch, caplog):
+    """An upsert needs a key, so incremental load keeps uniqueId — but it collapses the line items
+    of a multi-job day, so the run must say so instead of looking safe."""
+    params = {
+        **_PARAMS,
+        "resource": "timekeeping_timecard_metrics",
+        "load_type": "incremental_load",
+        "metric_group": "ACTUAL_TOTALS",
+    }
+    component = _build_component(tmp_path, monkeypatch, params)
+    resource = get_resource("timekeeping_timecard_metrics")
+
+    records = iter(
+        [
+            {
+                "employeeId": {"id": 14212},
+                "actualTotals": [
+                    {"uniqueId": "14212:2026-07-27:409", "applyDate": "2026-07-27", "hoursAmount": 8.0},
+                ],
+            }
+        ]
+    )
+    with caplog.at_level("WARNING"):
+        component._stream_and_write_table(resource, records)
+
+    cols = _schema_by_col(tmp_path / "data", "timekeeping_timecard_metrics_actual_totals")
+    assert cols["uniqueId"]["primary_key"] is True
+    assert any("not unique" in record.message.lower() and record.levelname == "WARNING" for record in caplog.records)
 
 
 def test_no_user_primary_key_on_exploded_resource_does_not_warn_about_override(tmp_path, monkeypatch, caplog):

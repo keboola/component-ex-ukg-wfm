@@ -85,6 +85,11 @@ class BodyStyle(StrEnum):
     NONE = "none"
 
 
+# Global fallback sub-window span for a window-chunkable resource when neither the config nor the
+# resource sets one. Matches the historical behaviour (one 365-day window for any realistic range).
+_DEFAULT_WINDOW_DAYS = 365
+
+
 class ResourceDef(BaseModel):
     name: str
     family: str
@@ -112,6 +117,22 @@ class ResourceDef(BaseModel):
     # timecard_metrics so the chosen metric section becomes per-line-item rows; the PK is then
     # resolved dynamically (resolve_primary_key) rather than from a static registry key.
     explode: bool = False
+    # Metric-group (API `select` token) exception to `window_chunkable`, for EMPLOYEE_SET_METRICS.
+    # The resource-level rule fails closed because the endpoint returns ONE period-rollup row per
+    # employee for most selects. A group listed here is different: its records are EXPLODED into
+    # per-line-item rows that each carry their own `applyDate`, so the rows of [A,B] + [B+1,C] are
+    # exactly the rows of [A,C] — splitting the window partitions the rows instead of aggregating
+    # them, and is therefore safe. Only groups VERIFIED to be per-line-item belong here
+    # (CFTL-814: ACTUAL_TOTALS — a production 3-week read returned 3,045,591 rows for ~16k
+    # employees, one per line item, each with applyDate + uniqueId). Every other group stays
+    # fail-closed until a live read proves the same shape; add it here once verified.
+    chunkable_select: list[str] = Field(default_factory=list)
+    # Default sub-window span (days) used when the resource is window-chunkable and the config
+    # leaves Window Chunk Size empty. 0 = use the global 365-day default. A small value is the
+    # point for a high-volume exploded read: a multi-month pull of millions of per-line-item rows
+    # is what hits the 256 MB limit, and only date-splitting reduces the per-response size for a
+    # resource whose rows are already spread over the whole range.
+    default_window_days: int = 0
     # A static schema FLOOR for this resource's output, keyed by the lowercased metric-group /
     # output-name suffix (the same suffix Component._output_name() appends, e.g. "actual_totals").
     # These are columns KNOWN to exist for that output table — always emitted (empty when a given
@@ -159,6 +180,32 @@ class ResourceDef(BaseModel):
             and self.window_max_minutes == 0
             and self.employee_scope == EmployeeScope.HYPERFIND
         )
+
+    def is_window_chunkable(self, select: list[str] | None = None) -> bool:
+        """True when this run's fetch window may be split into date sub-windows.
+
+        Same question as `window_chunkable`, but answered for the ACTUAL run rather than for the
+        resource alone: an EMPLOYEE_SET_METRICS resource is excluded at resource level because most
+        metric groups return a period rollup, yet a group listed in `chunkable_select` explodes into
+        per-line-item rows and IS splittable (see `chunkable_select`). Exactly one select token must
+        be chosen and it must be in that list — a multi-group read has no verified row shape, so it
+        stays fail-closed.
+        """
+        if self.window_chunkable:
+            return True
+        if not self.chunkable_select or self.incremental_style != IncrementalStyle.DATE_WINDOW:
+            return False
+        if self.window_max_minutes > 0 or self.employee_scope != EmployeeScope.HYPERFIND:
+            return False
+        return bool(select) and len(select) == 1 and select[0] in self.chunkable_select
+
+    def window_days_for(self, select: list[str] | None = None, window_days: int | None = None) -> int:
+        """Sub-window span (days) for this run: the config value, else the per-resource default."""
+        if window_days:
+            return window_days
+        if self.default_window_days and self.is_window_chunkable(select):
+            return self.default_window_days
+        return _DEFAULT_WINDOW_DAYS
 
 
 RESOURCE_REGISTRY: dict[str, ResourceDef] = {
@@ -272,9 +319,16 @@ RESOURCE_REGISTRY: dict[str, ResourceDef] = {
         date_field="start",
         records_key=None,
         explode=True,
-        # Exploded to per-line-item rows; the PK is uniqueId when present (resolve_primary_key), so
-        # the registry key is empty (dynamic). accruals keep employeeId_id — they are not exploded.
+        # Exploded to per-line-item rows; on incremental load the PK is uniqueId when present
+        # (resolve_primary_key), so the registry key is empty (dynamic). accruals keep
+        # employeeId_id — they are not exploded.
         primary_key=[],
+        # CFTL-814 item 3: ACTUAL_TOTALS explodes into per-line-item rows, so its window MAY be
+        # date-split (see ResourceDef.chunkable_select). 21 days by default: a multi-month pull of
+        # this group is the read that hit the 256 MB limit (3.0M rows / 3 weeks in production), and
+        # batch_size alone cannot bound it because every employee has rows in every sub-window.
+        chunkable_select=["ACTUAL_TOTALS"],
+        default_window_days=21,
         # Known-columns schema floor (see ResourceDef.known_columns) for the ACTUAL_TOTALS metric
         # group's output table. VERIFIED: this is the column set from a successful production run's
         # stored Storage schema for timekeeping_timecard_metrics_actual_totals — always emit these,
@@ -630,24 +684,42 @@ _EXPLODE_PK = "uniqueId"
 
 
 def resolve_primary_key(
-    resource: ResourceDef, seen_columns: list[str], config_pk: list[str] | None = None
+    resource: ResourceDef,
+    seen_columns: list[str],
+    config_pk: list[str] | None = None,
+    incremental: bool = True,
 ) -> list[str]:
     """The output-table primary key, resolving the dynamic key for exploded resources.
 
-    For an exploded resource the component owns the key: when the exploded rows expose `uniqueId`
-    (the per-line-item natural key) it is the PK — even over a user/registry key — so sections that
-    carry it (Actual/Scheduled/… totals) upsert incrementally with a real applyDate column. A
-    section without `uniqueId`, and every non-exploded resource, falls back to effective_primary_key
-    (user-supplied `primary_key` over the registry default).
+    Precedence for an exploded resource:
 
-    NOTE (CFTL-814): letting an explicit user `primary_key` win over `uniqueId` was considered and
-    deliberately NOT done here. `uniqueId` is `employeeId:applyDate:payCode`, which a customer
-    reported is not unique when one employee works several jobs in a day — but that collision is not
-    reproduced by any sample we have, and re-keying an EXISTING output table is not a supported
-    in-place Storage operation and would collapse line items under an upsert. It needs a confirmed
-    collision example and a table migration, so it is tracked separately rather than changed here.
+    1. An explicit user `primary_key` wins. It is the escape hatch for a tenant whose line items
+       need a wider key (e.g. uniqueId + job_id + labor account) and it is never silently replaced.
+    2. Otherwise, on INCREMENTAL load, `uniqueId` (the per-line-item key, `employeeId:applyDate:
+       payCode`) is used when the exploded rows expose it — an upsert has to have some key, and
+       without one the write would append duplicates unboundedly. The caller warns that this key
+       can collapse line items (see below).
+    3. Otherwise (FULL load), NO key. A full load does not need one, and `uniqueId` is not unique.
+
+    CFTL-814 (item 4) — why full load is now keyless. `uniqueId` is `employeeId:applyDate:payCode`,
+    which repeats when one employee works several jobs on one day. Storage then keeps ONE row per
+    key on import and drops the rest, so hours went missing with no error. The collision was not
+    reproducible from stored data precisely BECAUSE the key hid it: the stored table is unique by
+    construction. The customer proved it against a keyless copy of the same read (3 weeks,
+    724,379 rows): 2,401 uniqueId values carried more than one line and 2,461 lines were dropped in
+    production — e.g. one employee on 2026-09-12 with REG on two jobs kept 2.43 h and lost 8.98 h.
+    No candidate key is unique either (job + labor account still collapsed 19 rows; rows repeat
+    legitimately, e.g. six separate 1-hour rest premiums on one day), so the correct answer for a
+    full load is no key at all rather than a wider one.
+
+    MIGRATION: Storage cannot drop the primary key of an EXISTING table in place. A table already
+    keyed on uniqueId must be deleted once (or the row pointed at a new destination) before this
+    keyless full load can write it. The component logs this (see Component._warn_keyless_full_load).
+
+    Incremental load keeps `uniqueId` because an upsert needs a key; it remains lossy for
+    multi-job days, which is why full load is the documented choice for this resource.
     """
-    if resource.explode and _EXPLODE_PK in seen_columns:
+    if resource.explode and not config_pk and incremental and _EXPLODE_PK in seen_columns:
         return [_EXPLODE_PK]
     return effective_primary_key(resource, config_pk)
 
