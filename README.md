@@ -56,8 +56,15 @@ Supported resources
 >
 > **Timekeeping / `timekeeping_timecard_metrics`** requires a single **Timecard Metric Group**;
 > its response section is exploded into one row per line item (columns include `applyDate`, `hoursAmount`,
-> `payCode`, …) with `uniqueId` (`employeeId:applyDate:payCode`) as the primary key. Sections that expose
-> `uniqueId` upsert incrementally; a section without it falls back to full replace unless you set a Primary Key.
+> `payCode`, …). On **full load the table has NO primary key**: `uniqueId`
+> (`employeeId:applyDate:payCode`) repeats when one employee works several jobs on one day, and
+> Storage keeps one row per key on import, so a key would silently drop those line items. On
+> **incremental load** `uniqueId` is still used, because an upsert needs a key — it remains lossy for
+> multi-job days, so full load is the complete option. On incremental load a configured **Primary
+> Key** replaces `uniqueId` (use it for a wider line-item key); on full load it is ignored. An existing table is re-keyed automatically on the next
+> import: a table keyed on `uniqueId` loses that key on the first keyless full load. A new key can
+> only be created when the stored rows are unique on it, so switching a keyless table back to an
+> incremental load needs the table emptied first.
 > The output table is named per metric group (`{resource}_{metric_group}`, e.g.
 > `timekeeping_timecard_metrics_actual_totals`), so different metric groups land in separate,
 > schema-stable tables instead of sharing one table's schema and sticky-column state.
@@ -90,10 +97,15 @@ Incremental & windowing
   window is split into sub-windows to respect service limits and cap memory — **≤365 days by
   default**, or **`window_days`** when set (lower it to pull a large range in smaller pieces). Because
   WFM's `endDate` is inclusive, sub-windows are split so no calendar day is fetched twice.
-- **Rollup resources** (timecard metrics, accruals) and **net-change** resources are **never**
-  date-split — they read the whole `[since, until]` range in a single request (a rollup returns one
-  total per employee, so splitting would corrupt it), regardless of range length. They reject
-  `window_days`; control their memory with a smaller employee **`batch_size`** instead.
+- **Timecard Metrics / `ACTUAL_TOTALS`** is date-split as well, in **21-day** sub-windows by default
+  (override with `window_days`). Its records explode into per-line-item rows that each carry their own
+  `applyDate`, so the rows of consecutive sub-windows add up to exactly the rows of the whole window —
+  splitting partitions the rows instead of aggregating them, and keeps a multi-month pull under the
+  memory limit. Only metric groups verified to be per-line-item are split this way.
+- **Rollup reads** (every other timecard metric group, accruals) and **net-change** resources are
+  **never** date-split — they read the whole `[since, until]` range in a single request (a rollup
+  returns one total per employee, so splitting would corrupt it), regardless of range length. They
+  reject `window_days`; control their memory with a smaller employee **`batch_size`** instead.
 - Employee sets are chunked by each resource's per-call batch limit (≤500 for most, 100 for
   timecard-metrics/persons, 50 for activity net-changes), overridable per config with `batch_size`,
   and adaptively **halved on HTTP 413**.

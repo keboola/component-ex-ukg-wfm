@@ -1,11 +1,17 @@
 {
   "exit_code": null,
-  "stderr": "",
+  "stderr": "Resource 'timekeeping_timecard_metrics': the output table is written WITHOUT a primary key. A full load needs none, and 'uniqueId' (employee:date:payCode) is not unique when an employee works several jobs on one day, so keying on it would drop those line items. If the existing table is keyed on 'uniqueId', Keboola removes that key on this import.\n",
   "logs": [
     {
       "level": "INFO",
       "logger": "root",
       "message": "Obtained UKG WFM OAuth token (expires in 1799s).",
+      "timestamp": "2026-07-27T17:27:35.000Z"
+    },
+    {
+      "level": "WARNING",
+      "logger": "root",
+      "message": "Resource 'timekeeping_timecard_metrics': the output table is written WITHOUT a primary key. A full load needs none, and 'uniqueId' (employee:date:payCode) is not unique when an employee works several jobs on one day, so keying on it would drop those line items. If the existing table is keyed on 'uniqueId', Keboola removes that key on this import.",
       "timestamp": "2026-07-27T17:27:35.000Z"
     },
     {

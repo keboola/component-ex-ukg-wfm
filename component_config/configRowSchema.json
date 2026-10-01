@@ -116,7 +116,7 @@
       "minimum": 1,
       "maximum": 365,
       "options": {
-        "tooltip": "Optional. For a large date range on a per-event resource (schedules, shifts, timecards, leave, attendance, attestations), lower this to pull the data in smaller pieces so the job stays under the memory limit — each chunk is fetched and written separately. Leave empty for the default (365 days). NOT for rollup resources (Timecard Metrics, Accruals), which return one total per employee — control their memory with a smaller employee batch instead. Punch-level resources always use their own per-request cap.",
+        "tooltip": "Optional. For a large date range, lower this to pull the data in smaller pieces so the job stays under the memory limit — each chunk is fetched and written separately. Supported for per-event resources (schedules, shifts, timecards, leave, attendance, attestations) and for Timecard Metrics with the Actual totals metric group, whose rows are one per line item. Leave empty for the default (21 days for Timecard Metrics / Actual totals, 365 days elsewhere). NOT for rollup reads (the other timecard metric groups, Accruals), which return one total per employee — control their memory with a smaller employee batch instead. Punch-level resources always use their own per-request cap.",
         "dependencies": {
           "window_type": "date_window"
         }
@@ -239,7 +239,7 @@
       "type": "string",
       "title": "Timecard Metric Group",
       "format": "select",
-      "description": "The one metric group (select token) to pull for Timekeeping — Timecard Metrics. Its line items are exploded into one row per item (with applyDate and a uniqueId primary key). Exactly one group is required for this resource.",
+      "description": "The one metric group (select token) to pull for Timekeeping — Timecard Metrics. Its line items are exploded into one row per item (with applyDate; on full load the table has no primary key). Exactly one group is required for this resource.",
       "enum": [
         "FTPTDATA_ALL",
         "FTPTDATA",
@@ -349,7 +349,7 @@
         "dependencies": {
           "load_type": "incremental_load"
         },
-        "tooltip": "On incremental load the component upserts on these columns. The WFM API doesn't expose a field list, so the picker reads columns from this resource's output table in Storage — which exists only after the first run. Run once, then click Re-load Columns from Storage; or type the column name(s) directly (before the first run, on a dev branch, or with a custom output bucket). Supplying a key also enables upsert for a resource with no registry default. Empty = the resource's registry default."
+        "tooltip": "On incremental load the component upserts on these columns. The WFM API doesn't expose a field list, so the picker reads columns from this resource's output table in Storage — which exists only after the first run. Run once, then click Re-load Columns from Storage; or type the column name(s) directly (before the first run, on a dev branch, or with a custom output bucket). Supplying a key also enables upsert for a resource with no registry default, and for Timecard Metrics it replaces the default 'uniqueId' key (use it when your line items need a wider key, e.g. plus job and labor account). Empty = the resource's registry default. Note: Timecard Metrics on FULL load is always written with no primary key (a configured key is ignored), because 'uniqueId' is not unique when an employee works several jobs on one day."
       },
       "propertyOrder": 80
     },

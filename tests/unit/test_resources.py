@@ -76,14 +76,31 @@ def test_timecard_metrics_is_exploded_and_keyless_in_registry():
     assert r.primary_key == []
 
 
-def test_resolve_pk_exploded_prefers_uniqueid():
+def test_resolve_pk_exploded_prefers_uniqueid_on_incremental():
+    # An upsert needs a key, so an incremental exploded run still keys on uniqueId.
     r = get_resource("timekeeping_timecard_metrics")
-    assert resolve_primary_key(r, ["uniqueId", "employeeId_id", "applyDate"]) == ["uniqueId"]
+    assert resolve_primary_key(r, ["uniqueId", "employeeId_id", "applyDate"], incremental=True) == ["uniqueId"]
 
 
-def test_resolve_pk_uniqueid_wins_over_config_for_exploded():
+def test_resolve_pk_exploded_is_keyless_on_full_load():
+    # CFTL-814 item 4: uniqueId (employee:date:payCode) is NOT unique across jobs, and Storage drops
+    # duplicate keys on import. A full load needs no key, so it must not declare one.
     r = get_resource("timekeeping_timecard_metrics")
-    assert resolve_primary_key(r, ["uniqueId"], config_pk=["employeeId_id"]) == ["uniqueId"]
+    assert resolve_primary_key(r, ["uniqueId", "employeeId_id", "applyDate"], incremental=False) == []
+
+
+def test_resolve_pk_config_key_wins_over_uniqueid_for_exploded_incremental():
+    # The configured key is the escape hatch for a tenant that needs a wider line-item key; on
+    # incremental load it is honoured instead of being replaced by uniqueId (pre-CFTL-814 behaviour).
+    r = get_resource("timekeeping_timecard_metrics")
+    assert resolve_primary_key(r, ["uniqueId"], config_pk=["employeeId_id"], incremental=True) == ["employeeId_id"]
+
+
+def test_resolve_pk_exploded_full_load_ignores_a_configured_key():
+    # The Primary Key field is shown only for incremental load, so a configured value on a full load
+    # is typically left over. Honouring it would collapse line items (one row per employee here).
+    r = get_resource("timekeeping_timecard_metrics")
+    assert resolve_primary_key(r, ["uniqueId"], config_pk=["employeeId_id"], incremental=False) == []
 
 
 def test_resolve_pk_exploded_without_uniqueid_falls_back_to_config():
@@ -218,3 +235,36 @@ def test_window_chunkable_false_for_rollup_and_special_resources(name):
 def test_chunkable_classification_covers_every_resource():
     # Guard: every registered resource is classified, so a new resource can't silently default in.
     assert _CHUNKABLE | _NOT_CHUNKABLE == set(RESOURCE_REGISTRY)
+
+
+# --- CFTL-814 item 3: per-metric-group window chunking ----------------------------------------
+
+
+def test_timecard_metrics_window_chunkable_only_for_actual_totals():
+    # The resource itself is not chunkable (most metric groups are period rollups), but the
+    # per-line-item ACTUAL_TOTALS group is.
+    r = get_resource("timekeeping_timecard_metrics")
+    assert r.window_chunkable is False
+    assert r.is_window_chunkable(["ACTUAL_TOTALS"]) is True
+    assert r.is_window_chunkable(["SCHEDULED_TOTALS"]) is False
+    assert r.is_window_chunkable([]) is False
+    assert r.is_window_chunkable(None) is False
+    # A multi-group read has no verified row shape -> fail closed.
+    assert r.is_window_chunkable(["ACTUAL_TOTALS", "SCHEDULED_TOTALS"]) is False
+
+
+def test_accruals_never_window_chunkable():
+    # Accruals ride the same endpoint but are NOT exploded, so no metric group unlocks chunking.
+    r = get_resource("accruals_balances")
+    assert r.window_chunkable is False
+    assert r.is_window_chunkable(["ACCRUAL_SUMMARY"]) is False
+
+
+def test_window_days_for_prefers_config_then_resource_default():
+    r = get_resource("timekeeping_timecard_metrics")
+    assert r.window_days_for(["ACTUAL_TOTALS"], 7) == 7
+    assert r.window_days_for(["ACTUAL_TOTALS"], None) == 21
+    # A non-chunkable group never gets the small default (it is read as one window anyway).
+    assert r.window_days_for(["SCHEDULED_TOTALS"], None) == 365
+    # A per-event resource keeps the historical 365-day fallback.
+    assert get_resource("timekeeping_timecards").window_days_for([], None) == 365

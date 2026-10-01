@@ -197,15 +197,22 @@ class Component(ComponentBase):
         if (
             self._config.window_days
             and resource.date_field
-            and not resource.window_chunkable
+            and not resource.is_window_chunkable(self._config.effective_select)
             and resource.window_max_minutes == 0
         ):
+            chunkable_groups = ", ".join(resource.chunkable_select)
+            hint = (
+                f"For '{resource.name}' it is supported only for the metric group(s) whose rows are "
+                f"per-line-item: {chunkable_groups}. "
+                if chunkable_groups
+                else ""
+            )
             raise UserException(
                 f"'window_days' is only supported for per-event resources; resource "
-                f"'{resource.name}' cannot be split into date sub-windows (it is a period rollup, a "
-                "net-change delta, or an org-level read, so it reads the whole range in one request). "
-                "Remove Window Chunk Size (days) — for a rollup resource (timecard metrics, accruals) "
-                "use 'batch_size' to control memory instead."
+                f"'{resource.name}' cannot be split into date sub-windows for this run (it is a "
+                "period rollup, a net-change delta, or an org-level read, so it reads the whole "
+                f"range in one request). {hint}Remove Window Chunk Size (days) — for a rollup "
+                "read use 'batch_size' to control memory instead."
             )
         # An exploded metrics resource needs exactly one section to explode. An empty selection
         # makes the API return every section (multiple lists per entry), which cannot be exploded
@@ -267,6 +274,65 @@ class Component(ComponentBase):
                 self._config.metric_groups,
                 self._config.metric_groups[0],
             )
+
+    def _warn_exploded_key(self, resource: ResourceDef, seen_columns: list[str], primary_key: list[str]) -> None:
+        """Explain the primary key chosen for an exploded resource, and the trade-off it carries.
+
+        Three cases matter to a user reading the job log (CFTL-814 item 4):
+
+        * FULL load, no key — the fix. `uniqueId` (employeeId:applyDate:payCode) repeats when one
+          employee works several jobs on one day, and Storage keeps one row per key on import, so a
+          keyed full load silently dropped those lines. No manual migration is needed: Keboola's
+          output mapping compares the manifest key with the existing table's key and removes it on
+          import (it logs "Modifying primary key of table ...").
+        * INCREMENTAL load, keyed on uniqueId — an upsert needs a key, so this stays, but it
+          collapses those same multi-job lines. Say so rather than let it look safe.
+        * An explicit Primary Key on incremental load — now honoured instead of being replaced by
+          uniqueId. Output mapping re-keys an existing table the same way, which only works if its
+          rows are unique on the new key. On full load it is ignored (see resolve_primary_key).
+        """
+        if not resource.explode:
+            return
+        if self._config.primary_key and not self._config.incremental:
+            logging.warning(
+                "Resource '%s': the configured primary_key %s is ignored on full load. A full load "
+                "of this resource is always written without a key, so no line item is dropped.",
+                resource.name,
+                self._config.primary_key,
+            )
+        elif self._config.primary_key:
+            logging.info(
+                "Resource '%s' uses the configured primary_key %s. If the existing table has a "
+                "different key, Keboola re-keys it on import, which only works if its rows are "
+                "unique on the new key.",
+                resource.name,
+                self._config.primary_key,
+            )
+            return
+        if primary_key == ["uniqueId"]:
+            logging.warning(
+                "Resource '%s' is loaded incrementally and upserts on 'uniqueId' "
+                "(employee:date:payCode). That value is NOT unique when one employee works several "
+                "jobs on one day, so those line items collapse into one row. Use Full Load for a "
+                "complete table, or set a Primary Key that separates the line items.",
+                resource.name,
+            )
+            return
+        if "uniqueId" in seen_columns:
+            logging.warning(
+                "Resource '%s': the output table is written WITHOUT a primary key. A full load needs "
+                "none, and 'uniqueId' (employee:date:payCode) is not unique when an employee works "
+                "several jobs on one day, so keying on it would drop those line items. If the "
+                "existing table is keyed on 'uniqueId', Keboola removes that key on this import.",
+                resource.name,
+            )
+            return
+        logging.warning(
+            "Exploded resource '%s' produced no 'uniqueId' column; it has no incremental key and "
+            "will load as a full replace. Set a Primary Key if you need incremental upsert for this "
+            "metric group.",
+            resource.name,
+        )
 
     def _load_sticky_columns(self, name: str) -> list[str]:
         """Every column emitted for this output table on prior runs, persisted in state.json.
@@ -443,21 +509,13 @@ class Component(ComponentBase):
             # PK is resolved from the columns actually produced: an exploded resource keys on
             # uniqueId when present (resolve_primary_key), else the user/registry key. Incremental
             # upsert engages only with a non-empty PK.
-            primary_key = resolve_primary_key(resource, list(seen_columns), self._config.primary_key)
-            if self._config.primary_key and primary_key != self._config.primary_key:
-                logging.warning(
-                    "Resource '%s' is keyed on 'uniqueId'; the configured primary_key %s is overridden for "
-                    "this exploded resource.",
-                    resource.name,
-                    self._config.primary_key,
-                )
-            if resource.explode and "uniqueId" not in seen_columns and not self._config.primary_key:
-                logging.warning(
-                    "Exploded resource '%s' produced no 'uniqueId' column; it has no incremental key and "
-                    "will load as a full replace. Set a Primary Key if you need incremental upsert for this "
-                    "metric group.",
-                    resource.name,
-                )
+            primary_key = resolve_primary_key(
+                resource,
+                list(seen_columns),
+                self._config.primary_key,
+                incremental=self._config.incremental,
+            )
+            self._warn_exploded_key(resource, list(seen_columns), primary_key)
             is_incremental = self._config.incremental and bool(primary_key)
             # Sticky schema: union this run's columns with every column seen before (state.json),
             # plus the resource's static known-columns floor (CFTL-814 — see
@@ -555,9 +613,12 @@ class Component(ComponentBase):
         # is where the "Missing columns" failure actually occurs.
         floor = self._known_columns_floor(resource)
         known = sorted(set(sticky) | set(floor)) if sticky else sticky
-        # PK resolved against the known columns so a prior uniqueId key (from an exploded resource)
-        # is preserved even on a zero-row run.
-        primary_key = resolve_primary_key(resource, known, self._config.primary_key)
+        # PK resolved against the known columns so an incremental run's uniqueId key (from an
+        # exploded resource) is preserved even on a zero-row run. A full load resolves to no key
+        # for an exploded resource (CFTL-814 item 4), matching the rows-present path.
+        primary_key = resolve_primary_key(
+            resource, known, self._config.primary_key, incremental=self._config.incremental
+        )
         is_incremental = self._config.incremental and bool(primary_key)
         # Re-emit the full accumulated column set (from state) so a zero-row run still matches the
         # existing table's schema, with PK columns as the anchor, UNIONED with the resource's static
@@ -574,6 +635,7 @@ class Component(ComponentBase):
                 resource.name,
             )
             return 0, []
+        self._warn_exploded_key(resource, known, primary_key)
         schema = {
             col: ColumnDefinition(
                 data_types=BaseType(
