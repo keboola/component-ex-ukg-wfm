@@ -365,6 +365,41 @@ def test_exploded_full_load_writes_no_primary_key_and_warns_about_migration(tmp_
     )
 
 
+def test_exploded_full_load_ignores_a_configured_primary_key(tmp_path, monkeypatch, caplog):
+    """A Primary Key left in the config from an incremental setup must not key a full load.
+
+    The UI shows the field only for incremental load, so on full load the value is usually stale.
+    Keying on it (here employeeId_id) would keep one row per employee and drop the rest.
+    """
+    params = {
+        **_PARAMS,
+        "resource": "timekeeping_timecard_metrics",
+        "load_type": "full_load",
+        "metric_group": "ACTUAL_TOTALS",
+        "primary_key": ["employeeId_id"],
+    }
+    component = _build_component(tmp_path, monkeypatch, params)
+    resource = get_resource("timekeeping_timecard_metrics")
+    records = iter(
+        [
+            {
+                "employeeId": {"id": 90001},
+                "actualTotals": [
+                    {"uniqueId": "90001:2026-09-12:152", "applyDate": "2026-09-12", "hoursAmount": 8.0},
+                    {"uniqueId": "90001:2026-09-13:152", "applyDate": "2026-09-13", "hoursAmount": 6.0},
+                ],
+            }
+        ]
+    )
+    with caplog.at_level("WARNING"):
+        row_count, _ = component._stream_and_write_table(resource, records)
+
+    assert row_count == 2
+    manifest = _manifest(tmp_path / "data", "timekeeping_timecard_metrics_actual_totals")
+    assert manifest.get("primary_key", []) == []
+    assert any("ignored on full load" in record.message for record in caplog.records if record.levelname == "WARNING")
+
+
 def test_exploded_zero_row_full_load_is_keyless_and_logs_the_key_change(tmp_path, monkeypatch, caplog):
     """The zero-row (header-only) path resolves the key the same way as the rows-present path.
 

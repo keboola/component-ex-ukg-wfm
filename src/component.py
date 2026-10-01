@@ -287,13 +287,20 @@ class Component(ComponentBase):
           import (it logs "Modifying primary key of table ...").
         * INCREMENTAL load, keyed on uniqueId — an upsert needs a key, so this stays, but it
           collapses those same multi-job lines. Say so rather than let it look safe.
-        * An explicit Primary Key — now honoured instead of being replaced by uniqueId. Output
-          mapping re-keys an existing table the same way, which only works if its rows are unique
-          on the new key.
+        * An explicit Primary Key on incremental load — now honoured instead of being replaced by
+          uniqueId. Output mapping re-keys an existing table the same way, which only works if its
+          rows are unique on the new key. On full load it is ignored (see resolve_primary_key).
         """
         if not resource.explode:
             return
-        if self._config.primary_key:
+        if self._config.primary_key and not self._config.incremental:
+            logging.warning(
+                "Resource '%s': the configured primary_key %s is ignored on full load. A full load "
+                "of this resource is always written without a key, so no line item is dropped.",
+                resource.name,
+                self._config.primary_key,
+            )
+        elif self._config.primary_key:
             logging.info(
                 "Resource '%s' uses the configured primary_key %s. If the existing table has a "
                 "different key, Keboola re-keys it on import, which only works if its rows are "

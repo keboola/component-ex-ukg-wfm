@@ -60,8 +60,8 @@ Supported resources
 > (`employeeId:applyDate:payCode`) repeats when one employee works several jobs on one day, and
 > Storage keeps one row per key on import, so a key would silently drop those line items. On
 > **incremental load** `uniqueId` is still used, because an upsert needs a key — it remains lossy for
-> multi-job days, so full load is the complete option. A configured **Primary Key** always wins over
-> both (use it for a wider line-item key). An existing table is re-keyed automatically on the next
+> multi-job days, so full load is the complete option. On incremental load a configured **Primary
+> Key** replaces `uniqueId` (use it for a wider line-item key); on full load it is ignored. An existing table is re-keyed automatically on the next
 > import: a table keyed on `uniqueId` loses that key on the first keyless full load. A new key can
 > only be created when the stored rows are unique on it, so switching a keyless table back to an
 > incremental load needs the table emptied first.

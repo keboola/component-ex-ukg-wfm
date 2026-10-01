@@ -726,3 +726,41 @@ def test_actual_totals_window_uses_21_day_default_when_unset():
             select=["ACTUAL_TOTALS"],
         )
     assert len(ranges) == 3
+
+
+def test_actual_totals_sub_windows_reconcile_missing_employees_once_for_the_whole_run(caplog):
+    # Employee 7 appears only in the first sub-window and 8 only in the second; 9 never appears.
+    # Only 9 is missing for the run, and the omission is logged ONCE, not once per sub-window, so
+    # max_missing_employees counts the whole read rather than each 21-day piece.
+    res = get_resource("timekeeping_timecard_metrics")
+    calls = {"n": 0}
+    with requests_mock.Mocker() as m:
+        c = _client(m)
+        m.post(
+            f"{HOST}/api/v1/commons/hyperfind/execute",
+            json={"count": 3, "result": {"refs": [{"id": 7}, {"id": 8}, {"id": 9}], "basePersons": []}},
+        )
+
+        def _per_window(request, context):
+            calls["n"] += 1
+            emp = 7 if calls["n"] == 1 else 8
+            return [{"employeeId": {"id": emp}, "actualTotals": [{"uniqueId": f"{emp}:2026-01-01:152"}]}]
+
+        m.post(f"{HOST}/api/v1{res.endpoint_path}", json=_per_window)
+        with caplog.at_level(logging.WARNING):
+            list(
+                iter_records(
+                    c,
+                    res,
+                    hyperfind_ref="253",
+                    since_iso="2026-01-01T00:00:00+00:00",
+                    until_iso="2026-01-14T00:00:00+00:00",  # 14 dates -> 2 windows of 7
+                    select=["ACTUAL_TOTALS"],
+                    window_days=7,
+                    max_missing_employees=1,
+                )
+            )
+    assert calls["n"] == 2
+    omissions = [r.getMessage() for r in caplog.records if "omitted" in r.getMessage()]
+    assert len(omissions) == 1
+    assert "omitted 1 of 3" in omissions[0]

@@ -1,5 +1,6 @@
 import logging
 from collections.abc import Iterator
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
@@ -149,6 +150,19 @@ def _employee_id_in_record(record: dict[str, Any]) -> int | None:
         return None
 
 
+@dataclass
+class EmployeeCoverage:
+    """Employees requested from / returned by an EMPLOYEE_SET_METRICS read, across every request.
+
+    A date-split read (ACTUAL_TOTALS sub-windows) shares one instance across all its sub-windows, so
+    an employee counts as returned when ANY sub-window carried them, and the omission is reported
+    once for the whole run instead of once per sub-window.
+    """
+
+    requested: set[int] = field(default_factory=set)
+    returned: set[int] = field(default_factory=set)
+
+
 def _reconcile_employee_set_metrics(
     resource_name: str,
     requested_ids: set[int],
@@ -203,6 +217,7 @@ def chunk_and_read(
     max_pages: int | None = None,
     batch_size: int | None = None,
     max_missing_employees: int | None = None,
+    coverage: EmployeeCoverage | None = None,
 ) -> Iterator[dict[str, Any]]:
     # A config batch_size overrides the registry default so a run can shrink the per-request payload
     # (the whole batch response is parsed into memory) below the component memory limit.
@@ -212,22 +227,25 @@ def chunk_and_read(
     # one family read with partial_success=true, so it is the only one where UKG can silently omit a
     # requested employee. requested/returned accumulate across every chunk (this is a generator, so
     # the actual comparison + single summary log only happens once every chunk is exhausted below).
+    # A caller-owned `coverage` (date-split read) is reconciled by that caller after its last
+    # sub-window; otherwise this call owns it and reconciles below.
     track_missing = resource.body_style == BodyStyle.EMPLOYEE_SET_METRICS
-    requested_ids: set[int] = set()
-    returned_ids: set[int] = set()
+    owns_coverage = coverage is None
+    if coverage is None:
+        coverage = EmployeeCoverage()
     for chunk in chunks:
         if track_missing:
-            requested_ids.update(chunk)
+            coverage.requested.update(chunk)
         for record in _read_chunk_with_shrink(
             client, resource, chunk, since_iso, until_iso, select, symbolic_period, hyperfind_ref, page_size, max_pages
         ):
             if track_missing:
                 emp_id = _employee_id_in_record(record)
                 if emp_id is not None:
-                    returned_ids.add(emp_id)
+                    coverage.returned.add(emp_id)
             yield record
-    if track_missing and requested_ids:
-        _reconcile_employee_set_metrics(resource.name, requested_ids, returned_ids, max_missing_employees)
+    if owns_coverage and track_missing and coverage.requested:
+        _reconcile_employee_set_metrics(resource.name, coverage.requested, coverage.returned, max_missing_employees)
 
 
 def _read_chunk_with_shrink(
@@ -543,6 +561,7 @@ def iter_records(
             windows = split_date_windows(start, end, max_days=resource.window_days_for(select, window_days))
         else:
             windows = [(start, end)]
+        coverage = EmployeeCoverage()
         for w_start, w_end in windows:
             yield from chunk_and_read(
                 client,
@@ -557,7 +576,10 @@ def iter_records(
                 max_pages,
                 batch_size,
                 max_missing_employees,
+                coverage,
             )
+        if resource.body_style == BodyStyle.EMPLOYEE_SET_METRICS and coverage.requested:
+            _reconcile_employee_set_metrics(resource.name, coverage.requested, coverage.returned, max_missing_employees)
     else:
         yield from chunk_and_read(
             client,

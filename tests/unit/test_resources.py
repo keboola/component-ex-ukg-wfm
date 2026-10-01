@@ -89,12 +89,18 @@ def test_resolve_pk_exploded_is_keyless_on_full_load():
     assert resolve_primary_key(r, ["uniqueId", "employeeId_id", "applyDate"], incremental=False) == []
 
 
-def test_resolve_pk_config_key_wins_over_uniqueid_for_exploded():
-    # The configured key is the escape hatch for a tenant that needs a wider line-item key; it is
-    # honoured instead of being replaced by uniqueId (the pre-CFTL-814 behaviour).
+def test_resolve_pk_config_key_wins_over_uniqueid_for_exploded_incremental():
+    # The configured key is the escape hatch for a tenant that needs a wider line-item key; on
+    # incremental load it is honoured instead of being replaced by uniqueId (pre-CFTL-814 behaviour).
     r = get_resource("timekeeping_timecard_metrics")
     assert resolve_primary_key(r, ["uniqueId"], config_pk=["employeeId_id"], incremental=True) == ["employeeId_id"]
-    assert resolve_primary_key(r, ["uniqueId"], config_pk=["employeeId_id"], incremental=False) == ["employeeId_id"]
+
+
+def test_resolve_pk_exploded_full_load_ignores_a_configured_key():
+    # The Primary Key field is shown only for incremental load, so a configured value on a full load
+    # is typically left over. Honouring it would collapse line items (one row per employee here).
+    r = get_resource("timekeeping_timecard_metrics")
+    assert resolve_primary_key(r, ["uniqueId"], config_pk=["employeeId_id"], incremental=False) == []
 
 
 def test_resolve_pk_exploded_without_uniqueid_falls_back_to_config():

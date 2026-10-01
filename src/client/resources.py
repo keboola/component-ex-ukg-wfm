@@ -693,13 +693,16 @@ def resolve_primary_key(
 
     Precedence for an exploded resource:
 
-    1. An explicit user `primary_key` wins. It is the escape hatch for a tenant whose line items
-       need a wider key (e.g. uniqueId + job_id + labor account) and it is never silently replaced.
-    2. Otherwise, on INCREMENTAL load, `uniqueId` (the per-line-item key, `employeeId:applyDate:
-       payCode`) is used when the exploded rows expose it — an upsert has to have some key, and
-       without one the write would append duplicates unboundedly. The caller warns that this key
-       can collapse line items (see below).
-    3. Otherwise (FULL load), NO key. A full load does not need one, and `uniqueId` is not unique.
+    1. FULL load: NO key, even when a `primary_key` is configured. A full load does not need one,
+       no candidate key is unique (see below), and the Primary Key field is shown only for
+       incremental load — so a value left over from an earlier incremental setup would otherwise
+       silently collapse line items (e.g. a stale `employeeId_id` keeps one row per employee).
+    2. INCREMENTAL load with an explicit user `primary_key`: that key. It is the escape hatch for
+       a tenant whose line items need a wider key (e.g. uniqueId + job_id + labor account).
+    3. INCREMENTAL load otherwise: `uniqueId` (the per-line-item key, `employeeId:applyDate:
+       payCode`) when the exploded rows expose it — an upsert has to have some key, and without one
+       the write would append duplicates unboundedly. The caller warns that this key can collapse
+       line items (see below).
 
     CFTL-814 (item 4) — why full load is now keyless. `uniqueId` is `employeeId:applyDate:payCode`,
     which repeats when one employee works several jobs on one day. Storage then keeps ONE row per
@@ -722,8 +725,11 @@ def resolve_primary_key(
     Incremental load keeps `uniqueId` because an upsert needs a key; it remains lossy for
     multi-job days, which is why full load is the documented choice for this resource.
     """
-    if resource.explode and not config_pk and incremental and _EXPLODE_PK in seen_columns:
-        return [_EXPLODE_PK]
+    if resource.explode:
+        if not incremental:
+            return []
+        if not config_pk and _EXPLODE_PK in seen_columns:
+            return [_EXPLODE_PK]
     return effective_primary_key(resource, config_pk)
 
 
