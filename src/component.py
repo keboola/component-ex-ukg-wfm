@@ -282,17 +282,22 @@ class Component(ComponentBase):
 
         * FULL load, no key — the fix. `uniqueId` (employeeId:applyDate:payCode) repeats when one
           employee works several jobs on one day, and Storage keeps one row per key on import, so a
-          keyed full load silently dropped those lines. The log also has to carry the migration
-          step, because Storage cannot remove the key from a table that already has one.
+          keyed full load silently dropped those lines. No manual migration is needed: Keboola's
+          output mapping compares the manifest key with the existing table's key and removes it on
+          import (it logs "Modifying primary key of table ...").
         * INCREMENTAL load, keyed on uniqueId — an upsert needs a key, so this stays, but it
           collapses those same multi-job lines. Say so rather than let it look safe.
-        * An explicit Primary Key — now honoured instead of being replaced by uniqueId.
+        * An explicit Primary Key — now honoured instead of being replaced by uniqueId. Output
+          mapping re-keys an existing table the same way, which only works if its rows are unique
+          on the new key.
         """
         if not resource.explode:
             return
         if self._config.primary_key:
             logging.info(
-                "Resource '%s' uses the configured primary_key %s.",
+                "Resource '%s' uses the configured primary_key %s. If the existing table has a "
+                "different key, Keboola re-keys it on import, which only works if its rows are "
+                "unique on the new key.",
                 resource.name,
                 self._config.primary_key,
             )
@@ -310,9 +315,8 @@ class Component(ComponentBase):
             logging.warning(
                 "Resource '%s': the output table is written WITHOUT a primary key. A full load needs "
                 "none, and 'uniqueId' (employee:date:payCode) is not unique when an employee works "
-                "several jobs on one day, so keying on it would drop those line items. If this table "
-                "already exists WITH a primary key, delete it once (Storage cannot remove a key in "
-                "place) and re-run.",
+                "several jobs on one day, so keying on it would drop those line items. If the "
+                "existing table is keyed on 'uniqueId', Keboola removes that key on this import.",
                 resource.name,
             )
             return
@@ -624,6 +628,7 @@ class Component(ComponentBase):
                 resource.name,
             )
             return 0, []
+        self._warn_exploded_key(resource, known, primary_key)
         schema = {
             col: ColumnDefinition(
                 data_types=BaseType(

@@ -469,16 +469,16 @@ def test_window_days_splits_pull_into_sub_windows():
                 res,
                 hyperfind_ref="253",
                 since_iso="2026-01-01T00:00:00+00:00",
-                until_iso="2026-04-01T00:00:00+00:00",  # 90 days
+                until_iso="2026-03-31T00:00:00+00:00",  # 90 dates, endDate inclusive
                 select=[],
                 window_days=30,
             )
         )
-    # 90 days / 30-day chunks -> 3 sub-windows, each its own request.
+    # 90 dates / 30-day chunks -> 3 sub-windows, each its own request.
     assert len(ranges) == 3
     assert rows == [{"id": 1}, {"id": 1}, {"id": 1}]
     assert ranges[0]["startDate"] == "2026-01-01"
-    assert ranges[-1]["endDate"] == "2026-04-01"
+    assert ranges[-1]["endDate"] == "2026-03-31"
     # Inclusive endDate: adjacent windows must NOT share a boundary day (else duplicate rows).
     ends = {r["endDate"] for r in ranges}
     starts = {r["startDate"] for r in ranges}
@@ -578,6 +578,7 @@ def test_employee_set_metrics_warning_caps_missing_id_sample_at_ten(caplog):
     warnings = [r.getMessage() for r in caplog.records if r.levelname == "WARNING"]
     assert any("omitted 15 of 15" in msg for msg in warnings)
     match = next(re.search(r"missing employee ids: (\[[^\]]*\])", msg) for msg in warnings if "omitted" in msg)
+    assert match is not None
     sample_ids = ast.literal_eval(match.group(1))
     assert len(sample_ids) <= 10
     assert sample_ids == list(range(1, 11))
@@ -701,27 +702,27 @@ def test_actual_totals_window_is_split_by_configured_window_days():
             m,
             res,
             since_iso="2026-01-01T00:00:00+00:00",
-            until_iso="2026-04-01T00:00:00+00:00",  # 90 days
+            until_iso="2026-03-31T00:00:00+00:00",  # 90 dates, endDate inclusive
             select=["ACTUAL_TOTALS"],
             window_days=30,
         )
     assert len(ranges) == 3
     assert ranges[0]["startDate"] == "2026-01-01"
-    assert ranges[-1]["endDate"] == "2026-04-01"
+    assert ranges[-1]["endDate"] == "2026-03-31"
     # Inclusive endDate: adjacent windows must not share a boundary day (else duplicate rows).
     assert {r["endDate"] for r in ranges}.isdisjoint({r["startDate"] for r in ranges})
 
 
 def test_actual_totals_window_uses_21_day_default_when_unset():
     # No window_days configured -> the resource default (21 days) applies, so a long pull is
-    # chunked without the user having to know about the field. 63 days / 21 -> 3 windows.
+    # chunked without the user having to know about the field. 63 dates / 21 -> 3 windows.
     res = get_resource("timekeeping_timecard_metrics")
     with requests_mock.Mocker() as m:
         ranges = _timecard_metrics_ranges(
             m,
             res,
             since_iso="2026-01-01T00:00:00+00:00",
-            until_iso="2026-03-05T00:00:00+00:00",  # 63 days
+            until_iso="2026-03-04T00:00:00+00:00",  # 63 dates, endDate inclusive
             select=["ACTUAL_TOTALS"],
         )
     assert len(ranges) == 3

@@ -712,9 +712,12 @@ def resolve_primary_key(
     legitimately, e.g. six separate 1-hour rest premiums on one day), so the correct answer for a
     full load is no key at all rather than a wider one.
 
-    MIGRATION: Storage cannot drop the primary key of an EXISTING table in place. A table already
-    keyed on uniqueId must be deleted once (or the row pointed at a new destination) before this
-    keyless full load can write it. The component logs this (see Component._warn_keyless_full_load).
+    MIGRATION: none needed. Keboola's output mapping compares the manifest key with an EXISTING
+    table's key and changes it on import (removeTablePrimaryKey, then createTablePrimaryKey for a
+    non-empty key), so a table keyed on uniqueId loses that key on the first keyless full load. A
+    NEW key can only be created when the stored rows are unique on it — e.g. going back from a
+    keyless table to an incremental uniqueId upsert fails until the table is emptied. The component
+    logs which key it chose (see Component._warn_exploded_key).
 
     Incremental load keeps `uniqueId` because an upsert needs a key; it remains lossy for
     multi-job days, which is why full load is the documented choice for this resource.

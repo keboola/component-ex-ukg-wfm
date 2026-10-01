@@ -47,7 +47,7 @@ def test_day_windows_do_not_share_a_boundary_day():
     # Regression: with an inclusive endDate, contiguous windows would fetch the boundary day twice
     # (duplicate rows for keyless resources). Adjacent windows must not share a calendar date.
     start = datetime(2026, 1, 1, tzinfo=UTC)
-    end = datetime(2026, 4, 1, tzinfo=UTC)  # 90 days
+    end = datetime(2026, 3, 31, tzinfo=UTC)  # 90 dates, endDate inclusive
     windows = split_date_windows(start, end, max_days=30)
     assert len(windows) == 3
     end_dates = {w[1].date() for w in windows}
@@ -55,6 +55,18 @@ def test_day_windows_do_not_share_a_boundary_day():
     assert end_dates.isdisjoint(start_dates)  # no day is both an end and a start
     assert windows[0][0] == start
     assert windows[-1][1] == end
+
+
+def test_day_windows_never_exceed_max_days_counting_both_endpoints():
+    # WFM's endDate is inclusive, so a window [a, b] covers (b - a).days + 1 dates. No window — the
+    # final one included — may cover more than max_days dates. Jan 1 - Mar 5 is 64 dates: three full
+    # 21-date windows and a 1-date tail, never a 22-date final window.
+    start = datetime(2026, 1, 1, tzinfo=UTC)
+    end = datetime(2026, 3, 5, tzinfo=UTC)
+    windows = split_date_windows(start, end, max_days=21)
+    spans = [(w_end.date() - w_start.date()).days + 1 for w_start, w_end in windows]
+    assert spans == [21, 21, 21, 1]
+    assert sum(spans) == (end.date() - start.date()).days + 1  # every date fetched exactly once
 
 
 def test_calendar_same_day_window_returns_single_window():

@@ -315,8 +315,7 @@ def test_exploded_full_load_writes_no_primary_key_and_warns_about_migration(tmp_
 
     uniqueId is employee:date:payCode, which repeats when one employee works several jobs on one
     day; Storage keeps one row per key on import, so a keyed full load silently dropped those
-    lines. The run must also tell the user that an existing keyed table has to be deleted once,
-    because Storage cannot remove a primary key in place.
+    lines. The run must also tell the user that an existing uniqueId key is removed on import.
     """
     params = {
         **_PARAMS,
@@ -360,7 +359,47 @@ def test_exploded_full_load_writes_no_primary_key_and_warns_about_migration(tmp_
     cols = _schema_by_col(tmp_path / "data", "timekeeping_timecard_metrics_actual_totals")
     assert not any(col.get("primary_key") for col in cols.values())
     assert any(
-        "without a primary key" in record.message.lower() and "delete it once" in record.message.lower()
+        "without a primary key" in record.message.lower() and "removes that key" in record.message.lower()
+        for record in caplog.records
+        if record.levelname == "WARNING"
+    )
+
+
+def test_exploded_zero_row_full_load_is_keyless_and_logs_the_key_change(tmp_path, monkeypatch, caplog):
+    """The zero-row (header-only) path resolves the key the same way as the rows-present path.
+
+    A full load of an exploded resource with prior sticky state writes a header-only table with no
+    primary key, so it must log the same key explanation as a run that returned rows.
+    """
+    params = {
+        **_PARAMS,
+        "resource": "timekeeping_timecard_metrics",
+        "load_type": "full_load",
+        "metric_group": "ACTUAL_TOTALS",
+    }
+    data_dir = _make_datadir(tmp_path, params)
+    (data_dir / "in" / "state.json").write_text(
+        json.dumps(
+            {
+                "schema_columns": {
+                    "timekeeping_timecard_metrics_actual_totals": ["applyDate", "employeeId_id", "uniqueId"]
+                }
+            }
+        )
+    )
+    monkeypatch.setenv("KBC_DATADIR", str(data_dir))
+    component = Component()
+    resource = get_resource("timekeeping_timecard_metrics")
+
+    with caplog.at_level("WARNING"):
+        row_count, columns = component._write_empty_table(resource)
+
+    assert row_count == 0
+    assert "uniqueId" in columns
+    manifest = _manifest(tmp_path / "data", "timekeeping_timecard_metrics_actual_totals")
+    assert manifest.get("primary_key", []) == []
+    assert any(
+        "without a primary key" in record.message.lower() and "removes that key" in record.message.lower()
         for record in caplog.records
         if record.levelname == "WARNING"
     )

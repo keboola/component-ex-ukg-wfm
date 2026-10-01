@@ -61,8 +61,10 @@ Supported resources
 > Storage keeps one row per key on import, so a key would silently drop those line items. On
 > **incremental load** `uniqueId` is still used, because an upsert needs a key — it remains lossy for
 > multi-job days, so full load is the complete option. A configured **Primary Key** always wins over
-> both (use it for a wider line-item key). Storage cannot remove a key from an existing table: a
-> table already keyed on `uniqueId` must be deleted once before a keyless full load can write it.
+> both (use it for a wider line-item key). An existing table is re-keyed automatically on the next
+> import: a table keyed on `uniqueId` loses that key on the first keyless full load. A new key can
+> only be created when the stored rows are unique on it, so switching a keyless table back to an
+> incremental load needs the table emptied first.
 > The output table is named per metric group (`{resource}_{metric_group}`, e.g.
 > `timekeeping_timecard_metrics_actual_totals`), so different metric groups land in separate,
 > schema-stable tables instead of sharing one table's schema and sticky-column state.

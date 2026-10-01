@@ -227,4 +227,4 @@ def test_error_detail_swallows_unexpected_failure_and_returns_empty():
         def text(self):
             raise RuntimeError("boom")
 
-    assert _error_detail(_BoomResponse()) == ""
+    assert _error_detail(_BoomResponse()) == ""  # ty: ignore[invalid-argument-type]

@@ -62,7 +62,7 @@ def split_date_windows(
     max_minutes > 0 takes precedence (minute-granular windows, e.g. the <= 60-minute punches cap):
     these stay CONTIGUOUS half-open datetime windows.
 
-    Otherwise the window is split by max_days into CALENDAR-DAY sub-windows. WFM's calendar
+    Otherwise the window is split into CALENDAR-DAY sub-windows of at most max_days dates each. WFM's calendar
     `dateRange.endDate` is INCLUSIVE (VERIFIED live: a read with endDate=D returns rows dated D; with
     endDate=D-1 they disappear), so contiguous windows sharing a boundary day would fetch that day
     twice — duplicating rows for keyless resources. Each non-final day-window therefore ends one day
@@ -92,17 +92,19 @@ def split_date_windows(
             windows.append((cursor, nxt))
             cursor = nxt
         return windows
-    # Calendar-day chunking with an inclusive endDate: end each non-final window a day early.
+    # Calendar-day chunking with an inclusive endDate: each window covers at most max_days calendar
+    # dates COUNTING BOTH ENDPOINTS, so a non-final window ends on its (max_days - 1)th day after the
+    # start and the next one begins the following day.
     if end.date() < start.date():
         return []
     if end.date() == start.date():
         return [(start, end)]
-    span = timedelta(days=max_days)
     windows = []
     cursor = start
-    while cursor < end:
-        nxt = min(cursor + span, end)
-        win_end = nxt if nxt >= end else nxt - timedelta(days=1)
-        windows.append((cursor, win_end))
-        cursor = nxt
-    return windows
+    while True:
+        last_day = cursor + timedelta(days=max_days - 1)
+        if last_day.date() >= end.date():
+            windows.append((cursor, end))
+            return windows
+        windows.append((cursor, last_day))
+        cursor = cursor + timedelta(days=max_days)
