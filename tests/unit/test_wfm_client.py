@@ -227,4 +227,5 @@ def test_error_detail_swallows_unexpected_failure_and_returns_empty():
         def text(self):
             raise RuntimeError("boom")
 
+    # A duck-typed stand-in: only .text matters, and building a real Response cannot make it raise.
     assert _error_detail(_BoomResponse()) == ""  # ty: ignore[invalid-argument-type]
